@@ -1,0 +1,27 @@
+# Project TODO
+
+- [ ] Define the production MVP boundaries, product vocabulary, user roles, and state transitions.
+- [ ] Model customers, homes, appliances, technicians, technician skills, availability, service requests, dispatch rounds, quotes, line items, invoices, payments, warranties, and service-history records.
+- [ ] Apply the database migration and document the schema's safety-critical constraints.
+- [ ] Build a premium native customer-app home experience with the exact primary CTA: “Tell us what's wrong”.
+- [ ] Build onboarding for account access, Hyderabad location, home address, home type, and appliance setup.
+- [ ] Build the customer home dashboard with quick services, active-job status, maintenance reminders, warranty summary, and a 0–100 Home Health Score.
+- [ ] Implement the AI-assisted Fix Anything flow for free-text input, optional image attachment, targeted follow-up questions, diagnosis guidance, service classification, urgency, and price-range estimate.
+- [ ] Implement controlled technician matching and selection choices for fastest, best-rated, lowest-cost, and preferred technician.
+- [ ] Build the technician dashboard, job feed, job detail, accept/decline actions, arrival, diagnosis, quote, proof, completion, earnings, and performance experiences.
+- [ ] Enforce the hard quote-approval gate so work cannot proceed without explicit customer approval.
+- [ ] Enforce the required completion OTP before a job can be marked completed.
+- [ ] Implement itemised payment records for visit fee, parts, labour, taxes, platform fee, payment method, and wallet credits.
+- [ ] Produce digital invoices containing job ID, technician identity, parts, labour, taxes, payment information, and an explicit 30-day service warranty.
+- [ ] Build the Home Service Passport with completed work records, proof, invoice, appliance history, and active 30-day warranty visibility.
+- [ ] Build the operations dashboard with monitoring, dispatch oversight, technician verification, pricing, job management, and analytics views.
+- [ ] Implement in-app notification records and status updates for customer and technician job milestones, payment, warranty, and maintenance reminders.
+- [ ] Build a live-tracking experience with a route/ETA interface that can later connect to real location providers.
+- [ ] Use secure storage patterns for uploaded issue photos and job-proof attachments.
+- [ ] Integrate real payments only after payment-provider configuration is supplied; otherwise make the checkout integration-ready without accepting live funds.
+- [ ] Write and run Vitest coverage for dispatch scoring, quote approval, completion OTP, invoice warranty inclusion, and principal workflow transitions.
+- [ ] Verify the desktop and mobile user interfaces, resolve errors, and complete a final project checkpoint.
+- [ ] Build the customer-facing product as a native-feeling mobile application rather than a public website.
+- [ ] Build the technician-facing product as a role-specific mobile application connected to the shared service backend.
+- [ ] Retain a web-based operations console only for internal dispatch, verification, pricing, and analytics workflows.
+- [ ] Configure mobile navigation, device permissions, attachment capture, location interfaces, and responsive interaction states for Android and iOS delivery.

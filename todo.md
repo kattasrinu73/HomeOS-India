@@ -26,3 +26,8 @@
 - [ ] Retain a web-based operations console only for internal dispatch, verification, pricing, and analytics workflows.
 - [x] Configure mobile navigation, device permissions, attachment capture, location interfaces, and responsive interaction states for Android and iOS delivery.
 - [x] Replace the default web-template placeholder in the project preview with a polished HomeOS customer preview that visibly demonstrates the product journey.
+- [x] Build complete visible customer-app navigation for onboarding, home, jobs, service passport, account, and Fix Anything.
+- [x] Build visible diagnosis, matching, technician-choice, active tracking, quote approval, completion OTP, checkout, invoice, and warranty states in the project preview.
+- [x] Complete interactive technician proof capture and completion-ready controls in the visible technician workflow.
+- [x] Make technician verification, pricing, job monitoring, and analytics actions interactive within the visible operations console.
+- [x] Verify every visible app route and state in the HomeOS preview before delivering the complete application experience.

@@ -15,7 +15,7 @@
 - [ ] Bind generated and persisted digital invoices containing job ID, technician identity, parts, labour, taxes, payment information, and an explicit 30-day service warranty to the mobile client.
 - [ ] Populate the Home Service Passport from completed work records, proof, invoices, appliance history, and active 30-day warranties.
 - [ ] Build the operations dashboard with monitoring, dispatch oversight, technician verification, pricing, job management, and analytics views.
-- [ ] Implement in-app notification records and status updates for customer and technician job milestones, payment, warranty, and maintenance reminders.
+- [x] Implement in-app notification records and status updates for customer and technician job milestones, payment, warranty, and maintenance reminders.
 - [x] Build a live-tracking experience with a route/ETA interface that can later connect to real location providers.
 - [x] Use secure storage patterns for uploaded issue photos and job-proof attachments.
 - [x] Integrate real payments only after payment-provider configuration is supplied; otherwise make the checkout integration-ready without accepting live funds.

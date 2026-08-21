@@ -36,3 +36,7 @@
 - [x] Add a clear visible customer-versus-technician role switch for testing both HomeOS journeys in Preview.
 - [x] Configure, validate, and successfully build the bundled Expo project as an internal Android APK; document the APK/Expo Go testing process for both roles.
 - [x] Verify document management, role switching, and the Android test path before handoff.
+- [x] Execute and document sequential customer flow validation from onboarding through diagnosis, matching, quote gate, OTP completion, checkout, invoice, warranty, and Passport.
+- [x] Execute and document sequential technician and operations-flow validation for offers, job handling, quote, proof, OTP request, verification, pricing, monitoring, and analytics.
+- [x] Validate backend tests, TypeScript, production web build, native Android bundle, and the completed Android APK artifact; record real-device and provider-dependent limits.
+- [x] Deliver an end-to-end testing output that distinguishes passed automated/preview/build checks from checks needing customer device or live-provider access.

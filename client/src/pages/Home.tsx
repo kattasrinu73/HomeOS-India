@@ -60,12 +60,16 @@ export default function Home() {
   const requestsQuery = trpc.homeos.requests.list.useQuery(undefined, { enabled: isAuthenticated, retry: false });
   const notificationsQuery = trpc.homeos.notifications.list.useQuery(undefined, { enabled: isAuthenticated, retry: false });
   const markNotificationRead = trpc.homeos.notifications.markRead.useMutation({ onSuccess: async () => { await utils.homeos.notifications.list.invalidate(); } });
+  const passportDocumentsQuery = trpc.homeos.passport.listDocuments.useQuery({ homeId: homesQuery.data?.[0]?.id ?? 0 }, { enabled: isAuthenticated && Boolean(homesQuery.data?.[0]?.id), retry: false });
+  const storePassportDocument = trpc.homeos.uploads.storeDocument.useMutation();
+  const addPassportDocument = trpc.homeos.passport.addDocument.useMutation({ onSuccess: async () => { await utils.homeos.passport.listDocuments.invalidate(); } });
+  const removePassportDocument = trpc.homeos.passport.removeDocument.useMutation({ onSuccess: async () => { await utils.homeos.passport.listDocuments.invalidate(); } });
   const assessIssue = trpc.homeos.diagnosis.assess.useMutation();
   const createRequest = trpc.homeos.requests.create.useMutation({ onSuccess: async () => { await utils.homeos.requests.list.invalidate(); } });
   const previewParams = new URLSearchParams(window.location.search);
   const [view, setView] = useState<View>(() => {
     const requestedView = previewParams.get("view");
-    const allowedViews: View[] = ["home", "onboarding", "fix", "assessment", "matching", "tracking", "quote", "otp", "checkout", "invoice", "jobs", "passport", "account", "technician", "techJob", "techQuote", "techProof", "operations"];
+    const allowedViews: View[] = ["home", "onboarding", "fix", "assessment", "matching", "tracking", "quote", "otp", "checkout", "invoice", "jobs", "passport", "account", "notifications", "technician", "techJob", "techQuote", "techProof", "operations"];
     return requestedView && allowedViews.includes(requestedView as View) ? requestedView as View : "home";
   });
   const [issue, setIssue] = useState("");

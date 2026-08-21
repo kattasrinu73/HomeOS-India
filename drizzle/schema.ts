@@ -23,6 +23,15 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const accountProfiles = mysqlTable("accountProfiles", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  serviceIntent: mysqlEnum("serviceIntent", ["customer", "technician"]).notNull().default("customer"),
+  onboardingCompletedAt: timestamp("onboardingCompletedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const homes = mysqlTable("homes", {
   id: int("id").autoincrement().primaryKey(),
   ownerId: int("ownerId").notNull(),

@@ -3,6 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
+  accountProfiles,
   dispatchOffers,
   homes,
   invoices,
@@ -120,7 +121,7 @@ export const homeosRouter = router({
         return storagePut(`homeos/${ctx.user.id}/passport/${nanoid(12)}.${extension}`, bytes, input.mimeType);
       }),
     }),
-    homes: router({
+  homes: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
       return db.select().from(homes).where(eq(homes.ownerId, ctx.user.id)).orderBy(desc(homes.updatedAt));
@@ -139,6 +140,44 @@ export const homeosRouter = router({
         await db.insert(homes).values({ ...input, ownerId: ctx.user.id, healthScore: 0 });
         const created = await db.select().from(homes).where(and(eq(homes.ownerId, ctx.user.id), eq(homes.label, input.label))).orderBy(desc(homes.id)).limit(1);
         return created[0];
+      }),
+  }),
+  account: router({
+    profile: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+      const [profile] = await db.select().from(accountProfiles).where(eq(accountProfiles.userId, ctx.user.id)).limit(1);
+      return { user: ctx.user, technician: technician ?? null, profile: profile ?? null };
+    }),
+    setServiceIntent: protectedProcedure
+      .input(z.object({ serviceIntent: z.enum(["customer", "technician"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const completedAt = new Date();
+        await db.insert(accountProfiles).values({ userId: ctx.user.id, serviceIntent: input.serviceIntent, onboardingCompletedAt: completedAt }).onDuplicateKeyUpdate({ set: { serviceIntent: input.serviceIntent, onboardingCompletedAt: completedAt } });
+        const [profile] = await db.select().from(accountProfiles).where(eq(accountProfiles.userId, ctx.user.id)).limit(1);
+        if (!profile) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save account intent." });
+        return profile;
+      }),
+    applyTechnician: protectedProcedure
+      .input(z.object({ displayName: z.string().trim().min(2).max(160) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [existing] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+        if (existing) return existing;
+        await db.insert(technicians).values({ userId: ctx.user.id, displayName: input.displayName, verificationStatus: "pending", availability: "offline", serviceRadiusKm: 5, completionRate: "0", onTimeRate: "0" });
+        const [created] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+        if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create technician profile." });
+        return created;
+      }),
+    setAvailability: protectedProcedure
+      .input(z.object({ availability: z.enum(["offline", "available", "busy"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+        if (!technician) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Create a technician profile before updating availability." });
+        await db.update(technicians).set({ availability: input.availability }).where(eq(technicians.id, technician.id));
+        return { success: true, availability: input.availability };
       }),
   }),
   diagnosis: router({
@@ -250,10 +289,13 @@ export const homeosRouter = router({
       }),
     startWork: protectedProcedure
       .input(z.object({ serviceRequestId: z.number().int().positive() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const db = await databaseOrThrow();
         const request = await db.select().from(serviceRequests).where(eq(serviceRequests.id, input.serviceRequestId)).limit(1);
         if (!request[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Service request not found." });
+        if (!request[0].assignedTechnicianId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Assign a verified technician before starting work." });
+        const [technician] = await db.select().from(technicians).where(and(eq(technicians.id, request[0].assignedTechnicianId), eq(technicians.userId, ctx.user.id))).limit(1);
+        if (!technician) throw new TRPCError({ code: "FORBIDDEN", message: "Only the assigned technician can start this work." });
         if (!canStartWork(request[0].status, request[0].quoteApprovedAt)) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Work cannot start until the customer explicitly approves the current quote." });
         }
@@ -262,10 +304,13 @@ export const homeosRouter = router({
       }),
     complete: protectedProcedure
       .input(z.object({ serviceRequestId: z.number().int().positive(), completionOtp: z.string().trim().min(4).max(8) }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const db = await databaseOrThrow();
         const request = await db.select().from(serviceRequests).where(eq(serviceRequests.id, input.serviceRequestId)).limit(1);
         if (!request[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Service request not found." });
+        if (!request[0].assignedTechnicianId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Assign a verified technician before completing work." });
+        const [technician] = await db.select().from(technicians).where(and(eq(technicians.id, request[0].assignedTechnicianId), eq(technicians.userId, ctx.user.id))).limit(1);
+        if (!technician) throw new TRPCError({ code: "FORBIDDEN", message: "Only the assigned technician can complete this work." });
         if (request[0].status !== "completion_pending" && request[0].status !== "in_progress") {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The job is not ready for OTP-gated completion." });
         }

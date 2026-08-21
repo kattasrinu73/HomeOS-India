@@ -41,3 +41,9 @@
 - [x] Validate backend tests, TypeScript, production web build, native Android bundle, and the completed Android APK artifact; record real-device and provider-dependent limits.
 - [x] Deliver an end-to-end testing output that distinguishes passed automated/preview/build checks from checks needing customer device or live-provider access.
 - [x] Create and deliver one complete Markdown handoff describing the HomeOS product, customer and technician apps, backend, data model, protected workflows, Passport documents, APK, testing, project structure, and remaining production work.
+- [x] Create and verify a saved account-based audit that inventories every remaining customer, technician, and operations prototype state and its persistent replacement.
+- [ ] Implement and verify a true sign-up route distinct from sign-in, explicit session-recovery UI, and a persisted customer-versus-technician role-intent flow.
+- [ ] Connect authenticated customer onboarding, homes, appliances, jobs, invoices, Passport, and documents to persisted backend data.
+- [ ] Connect authenticated technician profile, verification, skills, availability, offers, job actions, quotes, proof, and earnings to persisted backend data.
+- [ ] Replace mock dashboard, matching, dispatch, operations, notifications, tracking, and payment states with production-ready data contracts and loading/error/empty states.
+- [ ] Create a production-readiness plan covering real-time updates, device permissions, abuse prevention, observability, privacy, support, and provider activation.

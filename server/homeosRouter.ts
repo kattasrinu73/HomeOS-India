@@ -391,6 +391,12 @@ export const homeosRouter = router({
       const offers = await db.select().from(dispatchOffers).where(and(eq(dispatchOffers.technicianId, technician.id), eq(dispatchOffers.status, "offered"))).orderBy(desc(dispatchOffers.createdAt));
       return Promise.all(offers.map(async (offer) => ({ offer, request: (await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.serviceRequestId)).limit(1))[0] ?? null })));
     }),
+    jobs: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+      if (!technician) throw new TRPCError({ code: "FORBIDDEN", message: "Technician profile required." });
+      return db.select().from(serviceRequests).where(eq(serviceRequests.assignedTechnicianId, technician.id)).orderBy(desc(serviceRequests.updatedAt));
+    }),
     acceptOffer: protectedProcedure
       .input(z.object({ offerId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {

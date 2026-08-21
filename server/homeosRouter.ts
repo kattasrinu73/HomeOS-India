@@ -3,6 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
+  dispatchOffers,
   homes,
   invoices,
   jobProofs,
@@ -12,6 +13,7 @@ import {
   quotes,
   serviceRequests,
   technicians,
+  technicianSkills,
   warranties,
 } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -27,6 +29,7 @@ import {
   hashCompletionOtp,
   thirtyDayWarrantyEnds,
   verifyCompletionOtp,
+  rankDispatchCandidates,
 } from "./homeosWorkflow";
 
 const categories = ["electrical", "plumbing", "ac_appliances", "carpentry", "cleaning", "ro", "painting", "other"] as const;
@@ -62,6 +65,19 @@ async function databaseOrThrow() {
 
 function asHomeCategory(category: (typeof categories)[number]) {
   return category === "ac_appliances" ? "AC & appliances" : category.replaceAll("_", " ");
+}
+
+function normaliseServiceCategory(value: string) {
+  return value.toLowerCase().replace(/[^a-z]/g, "");
+}
+
+function distanceKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
+  const radians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = radians(to.latitude - from.latitude);
+  const dLon = radians(to.longitude - from.longitude);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(from.latitude)) * Math.cos(radians(to.latitude)) * Math.sin(dLon / 2) ** 2;
+  return 2 * earthRadiusKm * Math.asin(Math.sqrt(a));
 }
 
 export const homeosRouter = router({
@@ -245,7 +261,81 @@ export const homeosRouter = router({
         return { success: true, status: "completed" as const, completedAt };
       }),
   }),
+  dispatch: router({
+    runRound: adminProcedure
+      .input(z.object({ serviceRequestId: z.number().int().positive(), searchRadiusKm: z.number().int().min(1).max(25), limit: z.number().int().min(1).max(10).default(3) }))
+      .mutation(async ({ input }) => {
+        const db = await databaseOrThrow();
+        const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, input.serviceRequestId)).limit(1);
+        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Service request not found." });
+        if (!["submitted", "matched"].includes(request.status)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only unassigned requests can enter a dispatch round." });
+        const [home] = await db.select().from(homes).where(eq(homes.id, request.homeId)).limit(1);
+        if (!home?.latitude || !home.longitude) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The service home needs a precise location before dispatch." });
+        const eligibleTechnicians = await db.select().from(technicians).where(and(eq(technicians.availability, "available"), eq(technicians.verificationStatus, "verified")));
+        const skills = await db.select().from(technicianSkills).where(eq(technicianSkills.verified, true));
+        const skilledTechnicianIds = new Set(skills.filter((skill) => normaliseServiceCategory(skill.category) === normaliseServiceCategory(request.category)).map((skill) => skill.technicianId));
+        const candidates = eligibleTechnicians
+          .filter((technician) => technician.latitude && technician.longitude && skilledTechnicianIds.has(technician.id))
+          .map((technician) => ({
+            technician,
+            distanceKm: distanceKm({ latitude: Number(home.latitude), longitude: Number(home.longitude) }, { latitude: Number(technician.latitude), longitude: Number(technician.longitude) }),
+          }))
+          .filter((candidate) => candidate.distanceKm <= input.searchRadiusKm);
+        const ranked = rankDispatchCandidates(candidates.map(({ technician, distanceKm: candidateDistance }) => ({
+          technicianId: technician.id,
+          distanceKm: candidateDistance,
+          completionRate: Number(technician.completionRate),
+          onTimeRate: Number(technician.onTimeRate),
+          available: technician.availability === "available",
+          verifiedSkill: skilledTechnicianIds.has(technician.id),
+        }))).slice(0, input.limit);
+        const existingOffers = await db.select().from(dispatchOffers).where(eq(dispatchOffers.serviceRequestId, request.id));
+        const alreadyOffered = new Set(existingOffers.map((offer) => offer.technicianId));
+        const round = Math.max(0, ...existingOffers.map((offer) => offer.round)) + 1;
+        const offers = ranked.filter((candidate) => !alreadyOffered.has(candidate.technicianId));
+        if (offers.length) {
+          await db.insert(dispatchOffers).values(offers.map((candidate) => ({ serviceRequestId: request.id, technicianId: candidate.technicianId, round, searchRadiusKm: input.searchRadiusKm, score: candidate.score.toFixed(2) })));
+          await db.update(serviceRequests).set({ status: "matched" }).where(eq(serviceRequests.id, request.id));
+        }
+        return { round, offers, exhausted: offers.length === 0 };
+      }),
+    queue: adminProcedure.query(async () => {
+      const db = await databaseOrThrow();
+      return db.select().from(serviceRequests).where(inArray(serviceRequests.status, ["submitted", "matched", "assigned"])).orderBy(desc(serviceRequests.createdAt));
+    }),
+  }),
   technician: router({
+    offers: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+      if (!technician) throw new TRPCError({ code: "FORBIDDEN", message: "Technician profile required." });
+      const offers = await db.select().from(dispatchOffers).where(and(eq(dispatchOffers.technicianId, technician.id), eq(dispatchOffers.status, "offered"))).orderBy(desc(dispatchOffers.createdAt));
+      return Promise.all(offers.map(async (offer) => ({ offer, request: (await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.serviceRequestId)).limit(1))[0] ?? null })));
+    }),
+    acceptOffer: protectedProcedure
+      .input(z.object({ offerId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+        const [offer] = technician ? await db.select().from(dispatchOffers).where(and(eq(dispatchOffers.id, input.offerId), eq(dispatchOffers.technicianId, technician.id))).limit(1) : [];
+        if (!technician || !offer || offer.status !== "offered") throw new TRPCError({ code: "FORBIDDEN", message: "This dispatch offer is unavailable." });
+        const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.serviceRequestId)).limit(1);
+        if (!request || request.assignedTechnicianId || !["submitted", "matched"].includes(request.status)) throw new TRPCError({ code: "CONFLICT", message: "This job has already been assigned." });
+        await db.update(dispatchOffers).set({ status: "accepted" }).where(eq(dispatchOffers.id, offer.id));
+        await db.update(dispatchOffers).set({ status: "expired" }).where(and(eq(dispatchOffers.serviceRequestId, request.id), eq(dispatchOffers.status, "offered")));
+        await db.update(serviceRequests).set({ status: "assigned", assignedTechnicianId: technician.id }).where(eq(serviceRequests.id, request.id));
+        await db.insert(notificationRecords).values({ userId: request.customerId, serviceRequestId: request.id, event: "technician_assigned", title: "A qualified technician has accepted", body: "Your selected service professional is preparing to travel to your home." });
+        return { success: true, status: "assigned" as const };
+      }),
+    declineOffer: protectedProcedure
+      .input(z.object({ offerId: z.number().int().positive(), reason: z.enum(["too_far", "wrong_skill", "occupied", "unsupported_service", "safety_concern", "parts_unavailable", "other"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+        if (!technician) throw new TRPCError({ code: "FORBIDDEN", message: "Technician profile required." });
+        await db.update(dispatchOffers).set({ status: "declined", declineReason: input.reason }).where(and(eq(dispatchOffers.id, input.offerId), eq(dispatchOffers.technicianId, technician.id), eq(dispatchOffers.status, "offered")));
+        return { success: true };
+      }),
     createQuote: protectedProcedure
       .input(z.object({
         serviceRequestId: z.number().int().positive(),

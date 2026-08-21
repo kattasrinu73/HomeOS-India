@@ -25,3 +25,4 @@
 - [ ] Build the technician-facing product as a role-specific mobile application connected to the shared service backend.
 - [ ] Retain a web-based operations console only for internal dispatch, verification, pricing, and analytics workflows.
 - [x] Configure mobile navigation, device permissions, attachment capture, location interfaces, and responsive interaction states for Android and iOS delivery.
+- [x] Replace the default web-template placeholder in the project preview with a polished HomeOS customer preview that visibly demonstrates the product journey.

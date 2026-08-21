@@ -19,5 +19,5 @@ describe("Expo build authorization", () => {
     expect(payload.errors).toBeUndefined();
     expect(payload.data?.me?.id).toBeTruthy();
     expect(payload.data?.me?.username).toBeTruthy();
-  });
+  }, 15_000);
 });

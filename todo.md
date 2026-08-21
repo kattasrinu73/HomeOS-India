@@ -46,4 +46,12 @@
 - [ ] Connect authenticated customer onboarding, homes, appliances, jobs, invoices, Passport, and documents to persisted backend data.
 - [ ] Connect authenticated technician profile, verification, skills, availability, offers, job actions, quotes, proof, and earnings to persisted backend data.
 - [ ] Replace mock dashboard, matching, dispatch, operations, notifications, tracking, and payment states with production-ready data contracts and loading/error/empty states.
-- [ ] Create a production-readiness plan covering real-time updates, device permissions, abuse prevention, observability, privacy, support, and provider activation.
+- [x] Create a production-readiness plan covering real-time updates, device permissions, abuse prevention, observability, privacy, support, and provider activation.
+- [x] Replace Passport health, service-record, document-list, upload, and removal mock state with protected persisted data.
+- [x] Replace customer tracking, quote approval, checkout total, and invoice/warranty mock state with the active request detail contract.
+- [x] Replace technician offer and assigned-job mock state with protected offer and job data, including accept/decline actions.
+- [x] Replace operations metric and dispatch-queue mock state with protected overview and queue data.
+- [ ] Expand workflow unit coverage where needed and complete final type, test, visual, and production-release validation.
+- [ ] Complete and verify confirmed-payment handling so invoices and warranties appear end to end, including the customer-visible payment method.
+- [ ] Add visible Passport file type and 10 MB validation feedback, then bind the same secure document workflow to the Expo native client or explicitly revise its delivery scope.
+- [ ] Add router-level Vitest coverage for quote approval, start-work gating, OTP completion, and confirmed-payment invoice/warranty transitions.

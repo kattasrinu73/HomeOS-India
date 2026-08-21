@@ -21,6 +21,16 @@ describe("HomeOS service workflow", () => {
     expect(ranked[0]?.technicianId).toBe(1);
   });
 
+  it("prioritises a dependable nearby verified technician over a nearer but less reliable candidate", () => {
+    const ranked = rankDispatchCandidates([
+      { technicianId: 11, distanceKm: 0.3, completionRate: 85, onTimeRate: 85, available: true, verifiedSkill: true },
+      { technicianId: 12, distanceKm: 2, completionRate: 100, onTimeRate: 100, available: true, verifiedSkill: true },
+    ]);
+
+    expect(ranked.map((candidate) => candidate.technicianId)).toEqual([12, 11]);
+    expect(ranked[0]?.score).toBeGreaterThan(ranked[1]?.score ?? 0);
+  });
+
   it("requires an explicitly approved quote before work can start", () => {
     expect(canStartWork("quote_approved", null)).toBe(false);
     expect(canStartWork("quote_pending", new Date())).toBe(false);
@@ -45,6 +55,27 @@ describe("HomeOS service workflow", () => {
       warrantyDays: 30,
     });
     expect(metadata.warrantyEndsAt.toISOString()).toBe("2026-09-20T00:00:00.000Z");
+  });
+
+  it("preserves the exact warranty end date in the customer-facing invoice payload", () => {
+    const warrantyEndsAt = new Date("2026-09-20T10:30:00.000Z");
+    const invoice = buildInvoicePayload({
+      jobId: "HOS-WARRANTY-1",
+      technicianIdentity: "Verified technician",
+      visitFee: 199,
+      labour: 800,
+      parts: 0,
+      taxes: 0,
+      platformFee: 0,
+      credits: 0,
+      paymentMethod: "card",
+      paymentStatus: "confirmed",
+      total: 999,
+      warrantyDays: 30,
+      warrantyEndsAt,
+    });
+
+    expect(invoice.warranty).toEqual({ days: 30, endsAt: warrantyEndsAt });
   });
 
   it("assembles every required invoice field from the persisted payment and warranty records", () => {

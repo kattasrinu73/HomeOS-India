@@ -6,7 +6,7 @@
 - [x] Build a premium native customer-app home experience with the exact primary CTA: “Tell us what's wrong”.
 - [ ] Connect account access, Hyderabad location, persisted home address, home type, and appliance setup to the mobile app and backend.
 - [ ] Bind the customer home dashboard to persisted quick services, active-job status, maintenance reminders, warranty summary, and a 0–100 Home Health Score.
-- [ ] Connect the AI-assisted Fix Anything flow to secure attachment upload and its backend LLM procedure.
+- [x] Connect the AI-assisted Fix Anything flow to secure attachment upload and its backend LLM procedure.
 - [ ] Implement persisted controlled technician matching, sequential dispatch rounds, radius expansion, and customer selection logic.
 - [ ] Complete the technician dashboard and job workflow with secure proof capture, persisted arrival/diagnosis/quote/completion state changes, earnings, and performance data.
 - [x] Enforce the hard quote-approval gate so work cannot proceed without explicit customer approval.
@@ -55,3 +55,5 @@
 - [ ] Complete and verify confirmed-payment handling so invoices and warranties appear end to end, including the customer-visible payment method.
 - [ ] Add visible Passport file type and 10 MB validation feedback, then bind the same secure document workflow to the Expo native client or explicitly revise its delivery scope.
 - [ ] Add router-level Vitest coverage for quote approval, start-work gating, OTP completion, and confirmed-payment invoice/warranty transitions.
+- [ ] Extend AI assessment to use an uploaded issue attachment and test assessment/upload paths with and without an image.
+- [ ] Connect newly created requests to an actual dispatch-round operator flow, persist real customer selection where required, and test radius expansion plus offer outcomes.

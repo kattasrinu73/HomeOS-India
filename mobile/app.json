@@ -25,10 +25,22 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.homeos.india",
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "CAMERA", "READ_MEDIA_IMAGES", "POST_NOTIFICATIONS"]
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5ada4525-4bcc-4a9d-9d99-1d4bd2c23d66"
+      }
+    },
+    "owner": "srk553"
   }
 }

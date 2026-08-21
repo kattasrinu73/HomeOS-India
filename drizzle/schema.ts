@@ -138,6 +138,19 @@ export const jobProofs = mysqlTable("jobProofs", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [index("proofs_request_idx").on(table.serviceRequestId)]);
 
+export const passportDocuments = mysqlTable("passportDocuments", {
+  id: int("id").autoincrement().primaryKey(),
+  homeId: int("homeId").notNull(),
+  ownerId: int("ownerId").notNull(),
+  documentType: mysqlEnum("documentType", ["appliance_invoice", "warranty_paper", "installation_record", "service_document", "other"]).notNull(),
+  label: varchar("label", { length: 180 }).notNull(),
+  fileKey: varchar("fileKey", { length: 512 }).notNull(),
+  fileUrl: varchar("fileUrl", { length: 512 }).notNull(),
+  mimeType: varchar("mimeType", { length: 100 }).notNull(),
+  fileSize: int("fileSize").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [index("passport_documents_home_idx").on(table.homeId), index("passport_documents_owner_idx").on(table.ownerId)]);
+
 export const payments = mysqlTable("payments", {
   id: int("id").autoincrement().primaryKey(),
   serviceRequestId: int("serviceRequestId").notNull(),

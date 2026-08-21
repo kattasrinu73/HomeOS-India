@@ -8,6 +8,7 @@ import {
   invoices,
   jobProofs,
   notificationRecords,
+  passportDocuments,
   payments,
   quoteItems,
   quotes,
@@ -103,8 +104,23 @@ export const homeosRouter = router({
         );
         return stored;
       }),
-  }),
-  homes: router({
+    storeDocument: protectedProcedure
+      .input(z.object({
+        base64: z.string().min(8),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        filename: z.string().trim().min(1).max(180),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const payload = input.base64.replace(/^data:(application\/pdf|image\/(jpeg|png|webp));base64,/, "");
+        const bytes = Buffer.from(payload, "base64");
+        if (bytes.length === 0 || bytes.length > 10 * 1024 * 1024) {
+          throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Documents must be smaller than 10 MB." });
+        }
+        const extension = input.mimeType === "application/pdf" ? "pdf" : input.mimeType === "image/jpeg" ? "jpg" : input.mimeType.split("/")[1];
+        return storagePut(`homeos/${ctx.user.id}/passport/${nanoid(12)}.${extension}`, bytes, input.mimeType);
+      }),
+    }),
+    homes: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
       return db.select().from(homes).where(eq(homes.ownerId, ctx.user.id)).orderBy(desc(homes.updatedAt));
@@ -527,6 +543,41 @@ export const homeosRouter = router({
           return { serviceRequestId, invoice: invoice ?? null, warranty: warranty ?? null, proofs };
         }));
         return { home: home[0], requests, records };
+      }),
+    listDocuments: protectedProcedure
+      .input(z.object({ homeId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
+        if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot view documents for this home." });
+        return db.select().from(passportDocuments).where(and(eq(passportDocuments.homeId, input.homeId), eq(passportDocuments.ownerId, ctx.user.id))).orderBy(desc(passportDocuments.createdAt));
+      }),
+    addDocument: protectedProcedure
+      .input(z.object({
+        homeId: z.number().int().positive(),
+        documentType: z.enum(["appliance_invoice", "warranty_paper", "installation_record", "service_document", "other"]),
+        label: z.string().trim().min(1).max(180),
+        fileKey: z.string().min(1).max(512),
+        fileUrl: z.string().min(1).max(512),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        fileSize: z.number().int().positive().max(10 * 1024 * 1024),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
+        if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot add documents to this home." });
+        await db.insert(passportDocuments).values({ ...input, ownerId: ctx.user.id });
+        const [created] = await db.select().from(passportDocuments).where(and(eq(passportDocuments.homeId, input.homeId), eq(passportDocuments.ownerId, ctx.user.id), eq(passportDocuments.label, input.label))).orderBy(desc(passportDocuments.id)).limit(1);
+        return created;
+      }),
+    removeDocument: protectedProcedure
+      .input(z.object({ documentId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [document] = await db.select().from(passportDocuments).where(and(eq(passportDocuments.id, input.documentId), eq(passportDocuments.ownerId, ctx.user.id))).limit(1);
+        if (!document) throw new TRPCError({ code: "NOT_FOUND", message: "Passport document not found." });
+        await db.delete(passportDocuments).where(eq(passportDocuments.id, document.id));
+        return { success: true };
       }),
   }),
   operations: router({

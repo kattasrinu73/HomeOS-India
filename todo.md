@@ -31,3 +31,8 @@
 - [x] Complete interactive technician proof capture and completion-ready controls in the visible technician workflow.
 - [x] Make technician verification, pricing, job monitoring, and analytics actions interactive within the visible operations console.
 - [x] Verify every visible app route and state in the HomeOS preview before delivering the complete application experience.
+- [x] Add customer-managed document categories for appliance invoices, warranty papers, installation records, and service documents in the Home Service Passport.
+- [ ] Connect the Passport document-selection experience to secure upload and listing procedures after the authenticated mobile client transport is configured.
+- [x] Add a clear visible customer-versus-technician role switch for testing both HomeOS journeys in Preview.
+- [x] Configure, validate, and successfully build the bundled Expo project as an internal Android APK; document the APK/Expo Go testing process for both roles.
+- [x] Verify document management, role switching, and the Android test path before handoff.

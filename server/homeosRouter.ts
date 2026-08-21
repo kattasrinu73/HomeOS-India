@@ -232,6 +232,24 @@ export const homeosRouter = router({
       const db = await databaseOrThrow();
       return db.select().from(serviceRequests).where(eq(serviceRequests.customerId, ctx.user.id)).orderBy(desc(serviceRequests.updatedAt));
     }),
+    detail: protectedProcedure
+      .input(z.object({ publicId: z.string().trim().min(4).max(64) }))
+      .query(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [request] = await db.select().from(serviceRequests).where(and(eq(serviceRequests.publicId, input.publicId), eq(serviceRequests.customerId, ctx.user.id))).limit(1);
+        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Service request not found." });
+        const [home] = await db.select().from(homes).where(eq(homes.id, request.homeId)).limit(1);
+        const technician = request.assignedTechnicianId
+          ? (await db.select().from(technicians).where(eq(technicians.id, request.assignedTechnicianId)).limit(1))[0] ?? null
+          : null;
+        const [quote] = await db.select().from(quotes).where(eq(quotes.serviceRequestId, request.id)).orderBy(desc(quotes.id)).limit(1);
+        const quoteItemsForRequest = quote ? await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quote.id)) : [];
+        const [payment] = await db.select().from(payments).where(eq(payments.serviceRequestId, request.id)).orderBy(desc(payments.id)).limit(1);
+        const [invoice] = await db.select().from(invoices).where(eq(invoices.serviceRequestId, request.id)).limit(1);
+        const [warranty] = await db.select().from(warranties).where(eq(warranties.serviceRequestId, request.id)).limit(1);
+        const proofs = await db.select().from(jobProofs).where(eq(jobProofs.serviceRequestId, request.id));
+        return { request, home: home ?? null, technician, quote: quote ?? null, quoteItems: quoteItemsForRequest, payment: payment ?? null, invoice: invoice ?? null, warranty: warranty ?? null, proofs };
+      }),
     create: protectedProcedure
       .input(z.object({
         homeId: z.number().int().positive(),

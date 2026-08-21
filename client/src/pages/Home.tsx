@@ -58,6 +58,8 @@ export default function Home() {
   const applyTechnician = trpc.homeos.account.applyTechnician.useMutation({ onSuccess: async () => { await utils.homeos.account.profile.invalidate(); } });
   const setTechnicianAvailability = trpc.homeos.account.setAvailability.useMutation({ onSuccess: async () => { await utils.homeos.account.profile.invalidate(); } });
   const requestsQuery = trpc.homeos.requests.list.useQuery(undefined, { enabled: isAuthenticated, retry: false });
+  const activeRequestId = requestsQuery.data?.[0]?.publicId;
+  const activeRequestDetailQuery = trpc.homeos.requests.detail.useQuery({ publicId: activeRequestId ?? "" }, { enabled: isAuthenticated && Boolean(activeRequestId), retry: false });
   const notificationsQuery = trpc.homeos.notifications.list.useQuery(undefined, { enabled: isAuthenticated, retry: false });
   const markNotificationRead = trpc.homeos.notifications.markRead.useMutation({ onSuccess: async () => { await utils.homeos.notifications.list.invalidate(); } });
   const passportDocumentsQuery = trpc.homeos.passport.listDocuments.useQuery({ homeId: homesQuery.data?.[0]?.id ?? 0 }, { enabled: isAuthenticated && Boolean(homesQuery.data?.[0]?.id), retry: false });

@@ -8,6 +8,13 @@
       "when": 1787298724989,
       "tag": "0000_red_slayback",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787299808528,
+      "tag": "0001_fancy_ironclad",
+      "breakpoints": true
     }
   ]
 }

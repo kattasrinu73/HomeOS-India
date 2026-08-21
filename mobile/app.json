@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "HomeOS India",
+    "slug": "homeos-india-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "homeosindia",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.homeos.india",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "HomeOS uses your location to set your service address and track an active technician.",
+        "NSPhotoLibraryUsageDescription": "HomeOS uses photos to help assess an issue and document completed work.",
+        "NSCameraUsageDescription": "HomeOS uses your camera to capture a home-service issue or proof of work."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.homeos.india",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "CAMERA", "READ_MEDIA_IMAGES", "POST_NOTIFICATIONS"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

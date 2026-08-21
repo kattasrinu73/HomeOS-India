@@ -60,6 +60,10 @@ export default function Home() {
   const requestsQuery = trpc.homeos.requests.list.useQuery(undefined, { enabled: isAuthenticated, retry: false });
   const activeRequestId = requestsQuery.data?.[0]?.publicId;
   const activeRequestDetailQuery = trpc.homeos.requests.detail.useQuery({ publicId: activeRequestId ?? "" }, { enabled: isAuthenticated && Boolean(activeRequestId), retry: false });
+  const technicianOffersQuery = trpc.homeos.technician.offers.useQuery(undefined, { enabled: isAuthenticated && profileQuery.data?.profile?.serviceIntent === "technician", retry: false });
+  const technicianJobsQuery = trpc.homeos.technician.jobs.useQuery(undefined, { enabled: isAuthenticated && profileQuery.data?.profile?.serviceIntent === "technician", retry: false });
+  const operationsOverviewQuery = trpc.homeos.operations.overview.useQuery(undefined, { enabled: isAuthenticated && user?.role === "admin", retry: false });
+  const operationsQueueQuery = trpc.homeos.operations.dispatchQueue.useQuery(undefined, { enabled: isAuthenticated && user?.role === "admin", retry: false });
   const notificationsQuery = trpc.homeos.notifications.list.useQuery(undefined, { enabled: isAuthenticated, retry: false });
   const markNotificationRead = trpc.homeos.notifications.markRead.useMutation({ onSuccess: async () => { await utils.homeos.notifications.list.invalidate(); } });
   const passportDocumentsQuery = trpc.homeos.passport.listDocuments.useQuery({ homeId: homesQuery.data?.[0]?.id ?? 0 }, { enabled: isAuthenticated && Boolean(homesQuery.data?.[0]?.id), retry: false });

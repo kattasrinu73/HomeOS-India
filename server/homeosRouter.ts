@@ -431,7 +431,7 @@ export const homeosRouter = router({
         const db = await databaseOrThrow();
         const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
         const [offer] = technician ? await db.select().from(dispatchOffers).where(and(eq(dispatchOffers.id, input.offerId), eq(dispatchOffers.technicianId, technician.id))).limit(1) : [];
-        if (!technician || !offer || offer.status !== "offered") throw new TRPCError({ code: "FORBIDDEN", message: "This dispatch offer is unavailable." });
+        if (!technician || technician.verificationStatus !== "verified" || !offer || offer.status !== "offered") throw new TRPCError({ code: "FORBIDDEN", message: "This dispatch offer is unavailable to an unverified technician." });
         const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.serviceRequestId)).limit(1);
         if (!request || request.assignedTechnicianId || !["submitted", "matched"].includes(request.status)) throw new TRPCError({ code: "CONFLICT", message: "This job has already been assigned." });
         await db.update(dispatchOffers).set({ status: "accepted" }).where(eq(dispatchOffers.id, offer.id));
@@ -448,6 +448,32 @@ export const homeosRouter = router({
         if (!technician) throw new TRPCError({ code: "FORBIDDEN", message: "Technician profile required." });
         await db.update(dispatchOffers).set({ status: "declined", declineReason: input.reason }).where(and(eq(dispatchOffers.id, input.offerId), eq(dispatchOffers.technicianId, technician.id), eq(dispatchOffers.status, "offered")));
         return { success: true };
+      }),
+    advanceJob: protectedProcedure
+      .input(z.object({
+        serviceRequestId: z.number().int().positive(),
+        nextStatus: z.enum(["en_route", "arrived", "diagnosing"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+        if (!technician || technician.verificationStatus !== "verified") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only a verified technician can update travel and diagnosis status." });
+        }
+        const [request] = await db.select().from(serviceRequests).where(and(eq(serviceRequests.id, input.serviceRequestId), eq(serviceRequests.assignedTechnicianId, technician.id))).limit(1);
+        if (!request) throw new TRPCError({ code: "FORBIDDEN", message: "This request is not assigned to you." });
+        const expectedCurrentStatus = input.nextStatus === "en_route" ? "assigned" : input.nextStatus === "arrived" ? "en_route" : "arrived";
+        if (request.status !== expectedCurrentStatus) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: `This job must be ${expectedCurrentStatus.replaceAll("_", " ")} before it can be marked ${input.nextStatus.replaceAll("_", " ")}.` });
+        }
+        await db.update(serviceRequests).set({ status: input.nextStatus }).where(eq(serviceRequests.id, request.id));
+        const notification = input.nextStatus === "en_route"
+          ? { event: "technician_en_route", title: "Your technician is on the way", body: "Your verified technician has started travelling to the service location." }
+          : input.nextStatus === "arrived"
+            ? { event: "technician_arrived", title: "Your technician has arrived", body: "The technician has marked arrival and can now begin the diagnosis." }
+            : { event: "diagnosis_started", title: "Diagnosis has started", body: "Your technician is assessing the issue before preparing an itemised quote." };
+        await db.insert(notificationRecords).values({ userId: request.customerId, serviceRequestId: request.id, ...notification });
+        return { success: true, status: input.nextStatus };
       }),
     createQuote: protectedProcedure
       .input(z.object({
@@ -467,7 +493,7 @@ export const homeosRouter = router({
         }
         const request = await db.select().from(serviceRequests).where(and(eq(serviceRequests.id, input.serviceRequestId), eq(serviceRequests.assignedTechnicianId, technician[0].id))).limit(1);
         if (!request[0]) throw new TRPCError({ code: "FORBIDDEN", message: "This request is not assigned to you." });
-        if (!["arrived", "diagnosing", "quote_pending"].includes(request[0].status)) {
+        if (!["diagnosing", "quote_pending"].includes(request[0].status)) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A quote can be sent only after arrival and diagnosis." });
         }
         await db.update(quotes).set({ status: "superseded" }).where(and(eq(quotes.serviceRequestId, request[0].id), eq(quotes.status, "sent")));

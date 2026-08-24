@@ -65,3 +65,4 @@
 - [x] Show both persisted invoice identification and warranty status/date for the same completed request in native Passport history rows.
 - [x] Synchronise protected HomeOS notifications in the native customer account and present persisted read/unread status without sample alerts.
 - [x] Let an authenticated native technician create an itemised protected quote for an assigned job before requesting customer approval.
+- [x] Add protected native technician transitions from assigned through en route, arrival, and diagnosis so an itemised quote can be created at a valid server state.

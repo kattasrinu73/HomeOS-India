@@ -977,10 +977,12 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
     }
   };
 
-  const progressJob = async (job: SyncedServiceRequest, action: "start" | "completion_ready") => {
+  const progressJob = async (job: SyncedServiceRequest, action: "en_route" | "arrived" | "diagnosing" | "start" | "completion_ready") => {
     setJobActionId(job.id);
     try {
-      if (action === "start") {
+      if (["en_route", "arrived", "diagnosing"].includes(action)) {
+        await (homeosApi as any).homeos.technician.advanceJob.mutate({ serviceRequestId: job.id, nextStatus: action });
+      } else if (action === "start") {
         await (homeosApi as any).homeos.requests.startWork.mutate({ serviceRequestId: job.id });
       } else {
         await (homeosApi as any).homeos.technician.readyForCompletion.mutate({ serviceRequestId: job.id });
@@ -1079,7 +1081,7 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
           <SectionTitle title="Assigned work" />
           <View style={styles.panel}>{jobs.length ? jobs.map((job, index) => <View key={job.id}>
             <Row icon="clipboard-outline" title={job.category.replaceAll("_", " ")} detail={`${job.publicId} · ${job.status.replaceAll("_", " ")} · ${job.urgency} priority`} />
-            {["arrived", "diagnosing", "quote_pending"].includes(job.status) ? <View style={{ padding: 15, paddingTop: 0 }}>
+            {job.status === "assigned" ? <View style={{ padding: 15, paddingTop: 0 }}><Press onPress={() => void progressJob(job, "en_route")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Updating…" : "Start travel"}</Text><AppIcon name="navigate-outline" size={18} /></Press></View> : job.status === "en_route" ? <View style={{ padding: 15, paddingTop: 0 }}><Press onPress={() => void progressJob(job, "arrived")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Updating…" : "Mark arrival"}</Text><AppIcon name="location-outline" size={18} /></Press></View> : job.status === "arrived" ? <View style={{ padding: 15, paddingTop: 0 }}><Press onPress={() => void progressJob(job, "diagnosing")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Updating…" : "Start diagnosis"}</Text><AppIcon name="search-outline" size={18} /></Press></View> : ["diagnosing", "quote_pending"].includes(job.status) ? <View style={{ padding: 15, paddingTop: 0 }}>
               {quoteDraftJobId === job.id ? <View style={styles.inputPanel}>
                 <Text style={styles.inputLabel}>Diagnosis and work required</Text>
                 <TextInput value={quoteReason} onChangeText={setQuoteReason} placeholder="Explain the diagnosis and proposed work" placeholderTextColor="#98958D" multiline style={[styles.textArea, { minHeight: 72 }]} />

@@ -38,6 +38,7 @@ import {
   technicianProgressTransitions,
   buildTechnicianPerformanceSummary,
   buildCustomerDispatchHandoff,
+  calculateHomeHealthScore,
 } from "./homeosWorkflow";
 
 const categories = ["electrical", "plumbing", "ac_appliances", "carpentry", "cleaning", "ro", "painting", "other"] as const;
@@ -77,6 +78,27 @@ function asHomeCategory(category: (typeof categories)[number]) {
 
 function normaliseServiceCategory(value: string) {
   return value.toLowerCase().replace(/[^a-z]/g, "");
+}
+
+async function recalculateHomeHealthScore(db: Awaited<ReturnType<typeof databaseOrThrow>>, homeId: number) {
+  const [home] = await db.select().from(homes).where(eq(homes.id, homeId)).limit(1);
+  if (!home) return null;
+  const savedAppliances = await db.select({ id: appliances.id }).from(appliances).where(eq(appliances.homeId, homeId));
+  const homeRequests = await db.select({ id: serviceRequests.id, status: serviceRequests.status }).from(serviceRequests).where(eq(serviceRequests.homeId, homeId));
+  const completedRequestIds = homeRequests.filter((request) => request.status === "completed" || request.status === "paid").map((request) => request.id);
+  const activeWarranties = completedRequestIds.length
+    ? await db.select({ endsAt: warranties.endsAt, status: warranties.status }).from(warranties).where(inArray(warranties.serviceRequestId, completedRequestIds))
+    : [];
+  const score = calculateHomeHealthScore({
+    hasLocation: Boolean(home.latitude && home.longitude),
+    applianceCount: savedAppliances.length,
+    completedServiceCount: completedRequestIds.length,
+    activeWarrantyCount: activeWarranties.filter((warranty) => warranty.status === "active" && warranty.endsAt.getTime() > Date.now()).length,
+  });
+  if (home.healthScore !== score) {
+    await db.update(homes).set({ healthScore: score }).where(eq(homes.id, homeId));
+  }
+  return score;
 }
 
 function distanceKm(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
@@ -130,6 +152,8 @@ export const homeosRouter = router({
   homes: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
+      const savedHomes = await db.select().from(homes).where(eq(homes.ownerId, ctx.user.id)).orderBy(desc(homes.updatedAt));
+      await Promise.all(savedHomes.map((home) => recalculateHomeHealthScore(db, home.id)));
       return db.select().from(homes).where(eq(homes.ownerId, ctx.user.id)).orderBy(desc(homes.updatedAt));
     }),
     create: protectedProcedure
@@ -150,7 +174,12 @@ export const homeosRouter = router({
           latitude: input.latitude?.toFixed(7),
           longitude: input.longitude?.toFixed(7),
           ownerId: ctx.user.id,
-          healthScore: 0,
+          healthScore: calculateHomeHealthScore({
+            hasLocation: input.latitude !== undefined && input.longitude !== undefined,
+            applianceCount: 0,
+            completedServiceCount: 0,
+            activeWarrantyCount: 0,
+          }),
         });
         const created = await db.select().from(homes).where(and(eq(homes.ownerId, ctx.user.id), eq(homes.label, input.label))).orderBy(desc(homes.id)).limit(1);
         return created[0];
@@ -166,6 +195,7 @@ export const homeosRouter = router({
         const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
         if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot update this home location." });
         await db.update(homes).set({ latitude: input.latitude.toFixed(7), longitude: input.longitude.toFixed(7) }).where(eq(homes.id, home.id));
+        await recalculateHomeHealthScore(db, home.id);
         return { success: true };
       }),
   }),
@@ -191,6 +221,7 @@ export const homeosRouter = router({
         const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
         if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot add appliances to this home." });
         await db.insert(appliances).values(input);
+        await recalculateHomeHealthScore(db, input.homeId);
         const [created] = await db.select().from(appliances).where(and(eq(appliances.homeId, input.homeId), eq(appliances.category, input.category))).orderBy(desc(appliances.id)).limit(1);
         if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the appliance." });
         return created;
@@ -420,6 +451,7 @@ export const homeosRouter = router({
         }
         const completedAt = new Date();
         await db.update(serviceRequests).set({ status: "completed", completedAt }).where(eq(serviceRequests.id, request[0].id));
+        await recalculateHomeHealthScore(db, request[0].homeId);
         return { success: true, status: "completed" as const, completedAt };
       }),
   }),
@@ -686,6 +718,7 @@ export const homeosRouter = router({
         if (!invoice[0]) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to generate invoice." });
         await db.insert(warranties).values({ serviceRequestId: request[0].id, invoiceId: invoice[0].id, startsAt: completedAt, endsAt: invoiceMetadata.warrantyEndsAt });
         await db.update(serviceRequests).set({ status: "paid" }).where(eq(serviceRequests.id, request[0].id));
+        await recalculateHomeHealthScore(db, request[0].homeId);
         await db.insert(notificationRecords).values({ userId: request[0].customerId, serviceRequestId: request[0].id, event: "warranty_active", title: "Your 30-day warranty is active", body: `Payment is confirmed. Your service warranty is active until ${invoiceMetadata.warrantyEndsAt.toLocaleDateString("en-IN")}.` });
         return { invoice: invoice[0], warrantyEndsAt: invoiceMetadata.warrantyEndsAt };
       }),
@@ -730,6 +763,8 @@ export const homeosRouter = router({
         const db = await databaseOrThrow();
         const home = await db.select().from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
         if (!home[0]) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot view this home history." });
+        await recalculateHomeHealthScore(db, home[0].id);
+        const refreshedHome = await db.select().from(homes).where(eq(homes.id, home[0].id)).limit(1);
         const requests = await db.select().from(serviceRequests).where(eq(serviceRequests.homeId, input.homeId)).orderBy(desc(serviceRequests.createdAt));
         const requestIds = requests.map((request) => request.id);
         const records = await Promise.all(requestIds.map(async (serviceRequestId) => {
@@ -738,7 +773,7 @@ export const homeosRouter = router({
           const proofs = await db.select().from(jobProofs).where(eq(jobProofs.serviceRequestId, serviceRequestId));
           return { serviceRequestId, invoice: invoice ?? null, warranty: warranty ?? null, proofs };
         }));
-        return { home: home[0], requests, records };
+        return { home: refreshedHome[0] ?? home[0], requests, records };
       }),
     listDocuments: protectedProcedure
       .input(z.object({ homeId: z.number().int().positive() }))

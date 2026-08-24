@@ -97,3 +97,6 @@
 - [x] Record the latest successful internal Android APK containing provider-gated billing cleanup, server-status-only OTP guidance, and Passport upload constraints.
 - [x] Add assigned-technician OTP submission in the native app through the protected completion endpoint, with validation, error feedback, and a refreshed completed job state.
 - [x] Record the successful refreshed internal Android APK containing the assigned-technician protected OTP completion action.
+- [x] Calculate and persist a bounded Home Health Score from protected home completeness, appliance records, and completed-service history, then explain it in the customer app.
+- [x] Recompute Home Health Score from current protected records on home reads so expired warranties cannot leave a stale persisted score, with focused event and expiry-sensitive coverage.
+- [x] Add router-level tests proving Home Health Score recalculates after protected appliance creation, technician OTP completion, and provider-confirmed warranty activation.

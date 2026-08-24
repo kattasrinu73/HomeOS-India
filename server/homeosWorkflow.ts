@@ -30,6 +30,18 @@ export type DispatchOfferSummary = {
   status: "offered" | "accepted" | "declined" | "expired";
 };
 
+export function calculateHomeHealthScore(input: {
+  hasLocation: boolean;
+  applianceCount: number;
+  completedServiceCount: number;
+  activeWarrantyCount: number;
+}): number {
+  const appliancePoints = Math.min(Math.max(input.applianceCount, 0), 4) * 8;
+  const servicePoints = Math.min(Math.max(input.completedServiceCount, 0), 4) * 7;
+  const warrantyPoints = Math.min(Math.max(input.activeWarrantyCount, 0), 2) * 5;
+  return Math.min(100, Math.max(0, 20 + (input.hasLocation ? 10 : 0) + appliancePoints + servicePoints + warrantyPoints));
+}
+
 export const technicianProgressTransitions = {
   en_route: "assigned",
   arrived: "en_route",

@@ -4,6 +4,7 @@ import {
   buildInvoiceMetadata,
   buildCustomerDispatchHandoff,
   buildTechnicianPerformanceSummary,
+  calculateHomeHealthScore,
   canStartWork,
   canTechnicianAdvanceJob,
   hashCompletionOtp,
@@ -62,6 +63,13 @@ describe("HomeOS service workflow", () => {
       confirmedPaymentCount: 0,
       confirmedCustomerPaymentTotal: 0,
     });
+  });
+
+  it("derives a bounded Home Health Score only from saved protected-home record signals", () => {
+    expect(calculateHomeHealthScore({ hasLocation: false, applianceCount: 0, completedServiceCount: 0, activeWarrantyCount: 0 })).toBe(20);
+    expect(calculateHomeHealthScore({ hasLocation: true, applianceCount: 2, completedServiceCount: 1, activeWarrantyCount: 1 })).toBe(58);
+    expect(calculateHomeHealthScore({ hasLocation: true, applianceCount: 99, completedServiceCount: 99, activeWarrantyCount: 99 })).toBe(100);
+    expect(calculateHomeHealthScore({ hasLocation: false, applianceCount: -4, completedServiceCount: -1, activeWarrantyCount: -2 })).toBe(20);
   });
 
   it("derives customer dispatch handoff states from aggregate persisted offer facts without revealing technician data", () => {

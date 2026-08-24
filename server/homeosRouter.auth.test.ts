@@ -45,13 +45,14 @@ function createAuthenticatedContext(userId = 101, role: "user" | "admin" = "user
 function createMockDb() {
   const select = vi.fn(() => {
     const selectedRows = dbTestState.selections.shift() ?? [];
+    const query = {
+      limit: vi.fn(async () => selectedRows),
+      orderBy: vi.fn(() => query),
+      then: (resolve: (rows: unknown[]) => unknown, reject?: (error: unknown) => unknown) => Promise.resolve(selectedRows).then(resolve, reject),
+    };
     return {
       from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(async () => selectedRows),
-          orderBy: vi.fn(async () => selectedRows),
-          then: (resolve: (rows: unknown[]) => unknown, reject?: (error: unknown) => unknown) => Promise.resolve(selectedRows).then(resolve, reject),
-        })),
+        where: vi.fn(() => query),
       })),
     };
   });
@@ -173,14 +174,21 @@ describe("HomeOS protected workflow transitions", () => {
 
   it("persists a completed request only when its assigned technician supplies the valid completion OTP", async () => {
     dbTestState.selections.push(
-      [{ id: 19, assignedTechnicianId: 31, status: "completion_pending", completionOtpHash: hashCompletionOtp("4821", ENV.cookieSecret || "homeos-dev") }],
+      [{ id: 19, homeId: 5, assignedTechnicianId: 31, status: "completion_pending", completionOtpHash: hashCompletionOtp("4821", ENV.cookieSecret || "homeos-dev") }],
       [{ id: 31, userId: 101 }],
+      [{ id: 5, healthScore: 30, latitude: "17.4400000", longitude: "78.3900000" }],
+      [],
+      [{ id: 19, status: "completed" }],
+      [],
     );
 
     const result = await homeosRouter.createCaller(createAuthenticatedContext()).requests.complete({ serviceRequestId: 19, completionOtp: "4821" });
 
     expect(result).toMatchObject({ success: true, status: "completed", completedAt: expect.any(Date) });
-    expect(dbTestState.updates.map(({ values }) => values)).toEqual([expect.objectContaining({ status: "completed", completedAt: expect.any(Date) })]);
+    expect(dbTestState.updates.map(({ values }) => values)).toEqual([
+      expect.objectContaining({ status: "completed", completedAt: expect.any(Date) }),
+      expect.objectContaining({ healthScore: 37 }),
+    ]);
   });
 
   it("does not write a completion transition when the OTP is invalid", async () => {
@@ -230,6 +238,60 @@ describe("HomeOS protected workflow transitions", () => {
       id: 19,
       latestDispatchRound: expect.objectContaining({ round: 2, searchRadiusKm: 10, eligibleOfferCount: 2, outcome: "offers_created" }),
     })]);
+  });
+
+  it("refreshes a persisted Home Health Score on protected home reads when an active warranty has expired", async () => {
+    dbTestState.selections.push(
+      [{ id: 5, healthScore: 42 }],
+      [{ id: 5, healthScore: 42, latitude: "17.4400000", longitude: "78.3900000" }],
+      [],
+      [{ id: 19, status: "completed" }],
+      [{ status: "active", endsAt: new Date("2000-01-01T00:00:00.000Z") }],
+      [{ id: 5, healthScore: 37 }],
+    );
+
+    const homes = await homeosRouter.createCaller(createAuthenticatedContext()).homes.list();
+
+    expect(homes).toEqual([expect.objectContaining({ id: 5, healthScore: 37 })]);
+    expect(dbTestState.updates.map(({ values }) => values)).toEqual([expect.objectContaining({ healthScore: 37 })]);
+  });
+
+  it("recalculates Home Health Score after an owned appliance is added", async () => {
+    dbTestState.selections.push(
+      [{ id: 5 }],
+      [{ id: 5, healthScore: 30, latitude: "17.4400000", longitude: "78.3900000" }],
+      [{ id: 2 }],
+      [],
+      [{ id: 2, homeId: 5, category: "ac" }],
+    );
+
+    const appliance = await homeosRouter.createCaller(createAuthenticatedContext()).appliances.create({ homeId: 5, category: "ac" });
+
+    expect(appliance).toMatchObject({ id: 2, homeId: 5, category: "ac" });
+    expect(dbTestState.updates.map(({ values }) => values)).toEqual([expect.objectContaining({ healthScore: 38 })]);
+  });
+
+  it("recalculates Home Health Score after provider-confirmed warranty activation", async () => {
+    const completedAt = new Date("2026-08-24T06:00:00.000Z");
+    dbTestState.selections.push(
+      [{ id: 8, status: "pending", serviceRequestId: 19 }],
+      [{ id: 19, publicId: "HOS-HEALTH-1", homeId: 5, customerId: 101, status: "completed", completedAt, assignedTechnicianId: 31 }],
+      [{ displayName: "Verified technician" }],
+      [{ id: 15, serviceRequestId: 19 }],
+      [{ id: 5, healthScore: 37, latitude: "17.4400000", longitude: "78.3900000" }],
+      [],
+      [{ id: 19, status: "paid" }],
+      [{ status: "active", endsAt: new Date("2026-09-23T06:00:00.000Z") }],
+    );
+
+    const result = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).payments.confirmProviderPayment({ paymentId: 8, providerReference: "provider-health-8" });
+
+    expect(result).toMatchObject({ invoice: { id: 15 }, warrantyEndsAt: expect.any(Date) });
+    expect(dbTestState.updates.map(({ values }) => values)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: "confirmed", providerReference: "provider-health-8", paidAt: expect.any(Date) }),
+      expect.objectContaining({ status: "paid" }),
+      expect.objectContaining({ healthScore: 42 }),
+    ]));
   });
 
   it("sends a text-only protected service description to the structured assessment boundary", async () => {

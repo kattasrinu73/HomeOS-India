@@ -826,7 +826,7 @@ export default function App() {
 
           <View style={styles.homeHealth}>
             <View style={styles.healthOrb}><Text style={styles.healthNumber}>{syncedHome?.healthScore ?? "—"}</Text><Text style={styles.healthSuffix}>/100</Text></View>
-            <View style={styles.healthCopy}><Text style={styles.healthLabel}>Home Health</Text><Text style={styles.healthDetail}>{syncedHome ? `Saved for ${syncedHome.label}` : nativeSyncStatus === "signin_required" ? "Sign in to synchronise your home health." : "A saved HomeOS home will show its score here."}</Text></View>
+            <View style={styles.healthCopy}><Text style={styles.healthLabel}>Home Health</Text><Text style={styles.healthDetail}>{syncedHome ? `Based on saved home details, appliances, completed services, and active warranties for ${syncedHome.label}.` : nativeSyncStatus === "signin_required" ? "Sign in to synchronise your home health." : "A saved HomeOS home will show its record-based score here."}</Text></View>
             <Press onPress={() => setScreen("passport")} style={styles.roundLink}><AppIcon name="arrow-forward" size={18} /></Press>
           </View>
 
@@ -1008,7 +1008,7 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Home Service Passport" action={<AppIcon name="ellipsis-horizontal" size={20} />} />
           <View style={styles.passportHero}><View><Text style={styles.passportEyebrow}>YOUR HOME RECORD</Text><Text style={styles.passportTitle}>Everything remembered.</Text><Text style={styles.passportBody}>Service, proof, invoices, and warranty protection in one secure history.</Text></View><View style={styles.passportSeal}><AppIcon name="shield-checkmark" size={27} color={C.white} /></View></View>
-          <View style={styles.passportScore}><Text style={styles.metaLabel}>HOME HEALTH SCORE</Text><Text style={styles.passportScoreNumber}>{syncedHome?.healthScore ?? "—"} <Text style={styles.healthSuffix}>/ 100</Text></Text><Text style={styles.passportScoreDetail}>{syncedHome ? `Saved for ${syncedHome.label}.` : "Your score will appear after the signed-in app synchronises your saved home and service records."}</Text></View>
+          <View style={styles.passportScore}><Text style={styles.metaLabel}>HOME HEALTH SCORE</Text><Text style={styles.passportScoreNumber}>{syncedHome?.healthScore ?? "—"} <Text style={styles.healthSuffix}>/ 100</Text></Text><Text style={styles.passportScoreDetail}>{syncedHome ? `Record-based from ${syncedHome.label}, saved appliances, completed services, and active warranties.` : "Your score will appear after the signed-in app synchronises your saved home and service records."}</Text></View>
           <SectionTitle title="Service history" />
           <View style={styles.panel}>{syncedPassportHistory?.requests.length ? syncedPassportHistory.requests.map((request, index) => {
             const record = syncedPassportHistory.records.find((candidate) => candidate.serviceRequestId === request.id);

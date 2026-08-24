@@ -22,11 +22,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import {
-  canTransitionJob,
-  formatIndianRupees,
-  type JobStatus,
-} from "./src/workflow";
+import { formatIndianRupees, type JobStatus } from "./src/workflow";
 import { clearNativeSessionToken, homeosApi, homeosApiConfigured } from "./src/homeosApi";
 import { startNativeHomeosLogin } from "./src/nativeAuth";
 
@@ -296,7 +292,6 @@ export default function App() {
   const [locationLabel, setLocationLabel] = useState("Kondapur, Hyderabad");
   const [nativeCoordinates, setNativeCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus>("submitted");
-  const [quoteApproved, setQuoteApproved] = useState(false);
   const [otp, setOtp] = useState("");
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [homeStep, setHomeStep] = useState(0);
@@ -786,20 +781,21 @@ export default function App() {
     try {
       await (homeosApi as any).homeos.requests.approveQuote.mutate({ quoteId: syncedRequestDetail.quote.id });
       await refreshNativeHome();
-      setQuoteApproved(true);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       Alert.alert("Approval unavailable", "HomeOS could not approve this quote right now. Please try again.");
     }
   };
 
-  const verifyOtp = () => {
-    if (!canTransitionJob("completion_pending", "completed", { quoteApproved, completionOtp: otp })) {
-      Alert.alert("Enter the completion OTP", "Use the numeric one-time code sent for this service before marking it complete.");
+  const returnToProtectedCompletionStatus = () => {
+    if (!/^\d{4,8}$/.test(otp)) {
+      Alert.alert("Enter the completion OTP", "Check the numeric one-time code before sharing it with the assigned technician.");
       return;
     }
-    setJobStatus("completed");
-    setScreen("payment");
+    setOtp("");
+    Alert.alert("Share the code securely", "Give the code to your assigned technician after you inspect the work. Only their protected completion action can update this job; HomeOS will then refresh the service status.");
+    void refreshNativeHome();
+    setScreen("tracking");
   };
 
   const pay = () => {
@@ -967,9 +963,9 @@ export default function App() {
     if (screen === "otp") {
       return (
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScreenHeader title="Complete service" onBack={() => setScreen("quote")} />
-          <View style={styles.otpContent}><View style={styles.otpIcon}><AppIcon name="key-outline" size={28} color={C.coral} /></View><Text style={styles.flowTitle}>Enter your completion OTP.</Text><Text style={styles.flowSubtitle}>Check the one-time code sent for this service. It protects your home from an unauthorised completion.</Text><TextInput value={otp} onChangeText={setOtp} keyboardType="number-pad" maxLength={8} placeholder="Enter numeric OTP" placeholderTextColor="#9B978F" style={styles.otpInput} /><View style={styles.hardGate}><AppIcon name="shield-checkmark-outline" size={20} color={C.success} /><View style={styles.hardGateCopy}><Text style={styles.hardGateTitle}>Completion safeguard</Text><Text style={styles.hardGateText}>A completed service will create an invoice, activate a 30-day warranty, and update your Home Service Passport.</Text></View></View></View>
-          <View style={styles.stickyAction}><PrimaryButton label="Verify OTP & continue" icon="arrow-forward" onPress={verifyOtp} /></View>
+          <ScreenHeader title="Completion confirmation" onBack={() => setScreen("quote")} />
+          <View style={styles.otpContent}><View style={styles.otpIcon}><AppIcon name="key-outline" size={28} color={C.coral} /></View><Text style={styles.flowTitle}>Share your completion OTP.</Text><Text style={styles.flowSubtitle}>Check the one-time code sent for this service, then share it with the assigned technician only after inspecting the work.</Text><TextInput value={otp} onChangeText={setOtp} keyboardType="number-pad" maxLength={8} placeholder="Enter numeric OTP" placeholderTextColor="#9B978F" style={styles.otpInput} /><View style={styles.hardGate}><AppIcon name="shield-checkmark-outline" size={20} color={C.success} /><View style={styles.hardGateCopy}><Text style={styles.hardGateTitle}>Completion safeguard</Text><Text style={styles.hardGateText}>This customer screen cannot complete the job. The technician must submit the code through their protected workflow; payment, invoice, warranty, and Passport records then follow the server state.</Text></View></View></View>
+          <View style={styles.stickyAction}><PrimaryButton label="Return to protected status" icon="arrow-forward" onPress={returnToProtectedCompletionStatus} /></View>
         </KeyboardAvoidingView>
       );
     }

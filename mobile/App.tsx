@@ -7,7 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
   Image,
@@ -25,7 +25,6 @@ import {
 import {
   canTransitionJob,
   formatIndianRupees,
-  warrantyEndsOn,
   type JobStatus,
 } from "./src/workflow";
 import { clearNativeSessionToken, homeosApi, homeosApiConfigured } from "./src/homeosApi";
@@ -299,7 +298,6 @@ export default function App() {
   const [jobStatus, setJobStatus] = useState<JobStatus>("submitted");
   const [quoteApproved, setQuoteApproved] = useState(false);
   const [otp, setOtp] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("UPI");
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [homeStep, setHomeStep] = useState(0);
   const [syncedHome, setSyncedHome] = useState<SyncedHome | null>(null);
@@ -331,14 +329,6 @@ export default function App() {
   const [nativeLoginLoading, setNativeLoginLoading] = useState(false);
   const [nativeSyncStatus, setNativeSyncStatus] = useState<"loading" | "ready" | "signin_required" | "unavailable">("loading");
 
-  const warrantyEnd = useMemo(() => warrantyEndsOn(new Date()), []);
-  const invoiceLines = [
-    ["Visit fee", 199],
-    ["Labour", 300],
-    ["Parts", 450],
-    ["Taxes", 0],
-  ] as const;
-  const invoiceTotal = invoiceLines.reduce((total, [, amount]) => total + amount, 0);
   const selectedRequest = syncedRequests.find((request) => request.publicId === selectedRequestPublicId) ?? syncedRequests[0] ?? null;
 
   const refreshNativeHome = async (requestedPublicId?: string) => {
@@ -985,15 +975,26 @@ export default function App() {
     }
 
     if (screen === "payment") {
+      const persistedPaymentLines = syncedRequestDetail?.payment
+        ? [
+            ["Visit fee", syncedRequestDetail.payment.visitFee],
+            ["Labour", syncedRequestDetail.payment.labour],
+            ["Parts", syncedRequestDetail.payment.parts],
+            ["Taxes", syncedRequestDetail.payment.taxes],
+            ["Platform fee", syncedRequestDetail.payment.platformFee],
+            ["Wallet credits", -syncedRequestDetail.payment.credits],
+          ] as const
+        : (syncedRequestDetail?.quoteItems ?? []).map((item) => [item.label, item.amount] as const);
+      const persistedPaymentTotal = syncedRequestDetail?.payment?.total ?? persistedPaymentLines.reduce((total, [, amount]) => total + amount, 0);
       return (
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Payment" onBack={() => setScreen("otp")} />
-          <Text style={styles.flowTitle}>Review your bill.</Text>
-          <Text style={styles.flowSubtitle}>Every charge is itemised before payment.</Text>
-          <View style={styles.quotePanel}>{invoiceLines.map(([label, amount]) => <View key={label} style={styles.billLine}><Text style={styles.billLabel}>{label}</Text><Text style={styles.billAmount}>{formatIndianRupees(amount)}</Text></View>)}<View style={styles.panelLine} /><View style={styles.billLine}><Text style={styles.billTotal}>Amount due</Text><Text style={styles.billTotal}>{formatIndianRupees(invoiceTotal)}</Text></View></View>
-          <SectionTitle title="Pay with" />
-          {["UPI", "Card", "Wallet credits"].map((method) => <Press key={method} onPress={() => setPaymentMethod(method)} style={[styles.payMethod, paymentMethod === method && styles.payMethodSelected]}><View style={styles.payMethodIcon}><AppIcon name={method === "UPI" ? "qr-code-outline" : method === "Card" ? "card-outline" : "wallet-outline"} size={20} /></View><Text style={styles.payMethodText}>{method}</Text>{paymentMethod === method ? <AppIcon name="checkmark-circle" size={21} color={C.coral} /> : <View style={styles.radioEmpty} />}</Press>)}
-          <View style={styles.guidanceBox}><AppIcon name="lock-closed-outline" size={19} color={C.success} /><Text style={styles.guidanceText}>Live payment collection is enabled after your UPI and card payment provider has been securely connected.</Text></View>
+          <Text style={styles.flowTitle}>{syncedRequestDetail?.payment ? "Review protected payment." : "Review saved quote."}</Text>
+          <Text style={styles.flowSubtitle}>{syncedRequestDetail?.payment ? "Every amount below comes from the protected payment record." : "Every amount below comes from the technician’s protected itemised quote; HomeOS has not collected payment."}</Text>
+          {persistedPaymentLines.length ? <View style={styles.quotePanel}>{persistedPaymentLines.map(([label, amount]) => <View key={label} style={styles.billLine}><Text style={styles.billLabel}>{label}</Text><Text style={styles.billAmount}>{formatIndianRupees(amount)}</Text></View>)}<View style={styles.panelLine} /><View style={styles.billLine}><Text style={styles.billTotal}>{syncedRequestDetail?.payment ? "Protected payment total" : "Saved quote total"}</Text><Text style={styles.billTotal}>{formatIndianRupees(persistedPaymentTotal)}</Text></View></View> : <View style={styles.panel}><Row icon="receipt-outline" title="No itemised amount is available" detail="HomeOS will show a protected technician quote before any provider payment can be prepared." /></View>}
+          <SectionTitle title="Provider status" />
+          <View style={styles.panel}><Row icon="lock-closed-outline" title="Payment confirmation pending" detail={syncedRequestDetail?.payment ? `${syncedRequestDetail.payment.method.toUpperCase()} is recorded as ${syncedRequestDetail.payment.status}; invoice and warranty remain provider-confirmed only.` : "A payment method is chosen only in configured provider checkout. This app does not select or simulate one locally."} /></View>
+          <View style={styles.guidanceBox}><AppIcon name="lock-closed-outline" size={19} color={C.success} /><Text style={styles.guidanceText}>Live payment collection is enabled only after a secure UPI or card provider is connected and confirms the payment.</Text></View>
           <PrimaryButton label="Payment provider pending activation" icon="lock-closed-outline" onPress={pay} />
         </ScrollView>
       );

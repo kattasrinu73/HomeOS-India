@@ -90,3 +90,4 @@
 - [x] Show operations the persisted aggregate outcome of each manually launched dispatch round, including whether new eligible verified offers were created, without triggering automatic expansion.
 - [x] Add a protected operations query that derives persisted dispatch-round outcomes from stored offers and render the latest round, radius, and open/exhausted result for each queued request after refresh or navigation.
 - [x] Add protected AI assessment tests proving text-only and image-attached request payloads reach the structured model boundary and that failures return the existing cautious fallback.
+- [x] Remove hard-coded native payment amounts and render only itemised persisted quote or confirmed-payment values while payment-provider activation remains deferred.

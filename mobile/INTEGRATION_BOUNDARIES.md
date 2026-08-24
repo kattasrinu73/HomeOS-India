@@ -1,12 +1,13 @@
 # Production Integration Boundary
 
-The mobile app now contains the complete native interaction model for customer intake, guided diagnosis, controlled matching, tracking, quote approval, OTP-gated completion, payment review, invoice display, 30-day warranty visibility, Home Service Passport, onboarding, and technician work management. The shared backend project supplies the persistent schema and protected service workflow contracts for these features.
+The mobile app now contains the complete native interaction model for customer intake, guided diagnosis, controlled matching, tracking, quote approval, OTP-gated completion, payment review, invoice display, 30-day warranty visibility, Home Service Passport, onboarding, and technician work management. It includes a SecureStore-backed bearer-token transport foundation and queries the saved HomeOS home record when a valid native session exists. The shared backend project supplies the persistent schema and protected service workflow contracts for these features.
 
 The following services require deployment-specific configuration before the application can process real customer activity. The app deliberately does **not** claim to execute these actions until their providers are connected and tested.
 
 | Capability | Current application behaviour | Production connection required |
 | --- | --- | --- |
-| AI issue analysis | Mobile presents the guided diagnosis journey; the backend exposes a structured, server-side diagnosis procedure. | Authenticate the mobile client to the backend and invoke the protected diagnosis procedure. |
+| Native account and home data | The native transport reads a SecureStore bearer token, queries the protected homes endpoint, and renders the real saved location and Home Health Score when available. | Complete the native OAuth session-establishment callback, then add the remaining authenticated home, appliance, job, invoice, Passport, and document queries. |
+| AI issue analysis | Mobile presents the guided diagnosis journey; the backend exposes a structured, server-side diagnosis procedure. | Invoke the protected diagnosis procedure after the native OAuth session is established, including the uploaded issue image when supplied. |
 | Media attachments | The mobile app requests photo-library permission and captures an attachment URI. | Upload image bytes to the backend’s secure object storage and persist the returned file key and URL. |
 | Technician tracking | The app presents a location-ready map/ETA experience. | Collect consented foreground/background technician location, publish signed updates, and render them using the mapping provider. |
 | Notifications | The backend records notification events. | Configure push credentials and deliver notifications to device tokens. |

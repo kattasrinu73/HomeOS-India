@@ -291,7 +291,6 @@ export default function App() {
   const [attachmentMimeType, setAttachmentMimeType] = useState<"image/jpeg" | "image/png" | "image/webp">("image/jpeg");
   const [locationLabel, setLocationLabel] = useState("Kondapur, Hyderabad");
   const [nativeCoordinates, setNativeCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [jobStatus, setJobStatus] = useState<JobStatus>("submitted");
   const [otp, setOtp] = useState("");
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [homeStep, setHomeStep] = useState(0);
@@ -726,7 +725,6 @@ export default function App() {
       const assessment = await (homeosApi as any).homeos.diagnosis.assess.mutate({ description: issue, attachmentUrl }) as NativeAssessment;
       setNativeAssessment(assessment);
       setSelectedCategory(assessment.category.replaceAll("_", " "));
-      setJobStatus("submitted");
       setScreen("analysis");
     } catch {
       Alert.alert("Assessment unavailable", "HomeOS could not complete the protected assessment right now. Please try again.");
@@ -754,23 +752,12 @@ export default function App() {
       setSyncedRequests((requests) => [request, ...requests.filter((existing) => existing.id !== request.id)]);
       setSelectedRequestPublicId(request.publicId);
       void refreshNativeHome(request.publicId);
-      setJobStatus("submitted");
       setScreen("matches");
     } catch {
       Alert.alert("Request unavailable", "HomeOS could not create your secure service request right now. Please try again.");
     } finally {
       setNativeCreatingRequest(false);
     }
-  };
-
-  const selectTechnician = () => {
-    setJobStatus("en_route");
-    setScreen("tracking");
-  };
-
-  const showQuote = () => {
-    setJobStatus("quote_pending");
-    setScreen("quote");
   };
 
   const approveQuote = async () => {

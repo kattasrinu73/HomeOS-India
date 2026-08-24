@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildInvoicePayload,
   buildInvoiceMetadata,
+  buildCustomerDispatchHandoff,
   buildTechnicianPerformanceSummary,
   canStartWork,
   canTechnicianAdvanceJob,
@@ -60,6 +61,30 @@ describe("HomeOS service workflow", () => {
       activeJobCount: 0,
       confirmedPaymentCount: 0,
       confirmedCustomerPaymentTotal: 0,
+    });
+  });
+
+  it("derives customer dispatch handoff states from aggregate persisted offer facts without revealing technician data", () => {
+    expect(buildCustomerDispatchHandoff({ requestStatus: "submitted", offers: [] })).toMatchObject({
+      state: "awaiting_operator_round",
+      activeOfferCount: 0,
+      round: null,
+    });
+    expect(buildCustomerDispatchHandoff({ requestStatus: "matched", offers: [{ round: 1, searchRadiusKm: 5, status: "offered" }] })).toMatchObject({
+      state: "offers_out",
+      activeOfferCount: 1,
+      round: 1,
+      searchRadiusKm: 5,
+    });
+    expect(buildCustomerDispatchHandoff({ requestStatus: "matched", offers: [{ round: 1, searchRadiusKm: 5, status: "declined" }] })).toMatchObject({
+      state: "operator_review",
+      activeOfferCount: 0,
+      round: 1,
+    });
+    expect(buildCustomerDispatchHandoff({ requestStatus: "assigned", offers: [{ round: 1, searchRadiusKm: 5, status: "accepted" }] })).toMatchObject({
+      state: "technician_assigned",
+      activeOfferCount: 0,
+      round: 1,
     });
   });
 

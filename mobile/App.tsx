@@ -135,6 +135,15 @@ type NativeAccountProfile = {
   skills: NativeTechnicianSkill[];
 };
 
+type NativeDispatchHandoff = {
+  state: "awaiting_operator_round" | "offers_out" | "operator_review" | "technician_assigned";
+  label: string;
+  message: string;
+  round: number | null;
+  searchRadiusKm: number | null;
+  activeOfferCount: number;
+};
+
 type NativeRequestDetail = {
   request: SyncedServiceRequest;
   technician: { displayName: string } | null;
@@ -143,6 +152,7 @@ type NativeRequestDetail = {
   payment: { method: string; status: string; visitFee: number; labour: number; parts: number; taxes: number; platformFee: number; credits: number; total: number } | null;
   invoice: { invoiceNumber: string; technicianIdentity: string; warrantyDays: number; warrantyEndsAt: Date | string } | null;
   warranty: { endsAt: Date | string; status: string } | null;
+  dispatchHandoff: NativeDispatchHandoff;
 };
 
 type NativeAssessment = {
@@ -808,6 +818,7 @@ export default function App() {
 
   const renderCustomerScreen = () => {
     const trackingStatus = syncedRequestDetail?.request.status ?? selectedRequest?.status ?? "submitted";
+    const dispatchHandoff = syncedRequestDetail?.dispatchHandoff ?? null;
     const assignmentReached = Boolean(syncedRequestDetail?.technician) || ["assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid"].includes(trackingStatus);
     const diagnosisReached = ["diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid"].includes(trackingStatus);
     const completionReached = ["completion_pending", "completed", "paid"].includes(trackingStatus);
@@ -928,8 +939,8 @@ export default function App() {
           <ScreenHeader title="Find a qualified professional" onBack={() => setScreen("analysis")} />
           <Text style={styles.flowTitle}>Controlled verified matching.</Text>
           <Text style={styles.flowSubtitle}>The signed-in HomeOS service creates a request, then dispatches real eligible professionals by verified skill, availability, distance, and reliability.</Text>
-          <View style={[styles.matchCard, styles.matchCardSelected]}><View style={styles.matchTop}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={24} color={C.white} /></View><View style={styles.matchName}><Text style={styles.matchPerson}>{selectedRequest ? selectedRequest.publicId : "Awaiting secure dispatch"}</Text><Text style={styles.matchSpecialty}>{selectedRequest ? `${selectedRequest.category.replaceAll("_", " ")} request is ${selectedRequest.status.replaceAll("_", " ")}.` : "No technician, rating, availability, or ETA is shown until it is returned by the protected matching service."}</Text></View></View><Text style={styles.matchFoot}>HomeOS will show the real accepted technician after a verified offer is accepted. No fabricated professional details are displayed.</Text></View>
-          <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Open Jobs to refresh the protected request status. Dispatch rounds are controlled by verified operations rules.</Text></View>
+          <View style={[styles.matchCard, styles.matchCardSelected]}><View style={styles.matchTop}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={24} color={C.white} /></View><View style={styles.matchName}><Text style={styles.matchPerson}>{dispatchHandoff?.label ?? (selectedRequest ? selectedRequest.publicId : "Awaiting secure dispatch")}</Text><Text style={styles.matchSpecialty}>{dispatchHandoff?.message ?? (selectedRequest ? `${selectedRequest.category.replaceAll("_", " ")} request is ${selectedRequest.status.replaceAll("_", " ")}.` : "No technician, rating, availability, or ETA is shown until it is returned by the protected matching service.")}</Text></View></View><Text style={styles.matchFoot}>{dispatchHandoff?.state === "offers_out" ? "Technician identities and any route or ETA stay unavailable until a verified professional accepts the protected offer." : "HomeOS will show the real accepted technician after a verified offer is accepted. No fabricated professional details are displayed."}</Text></View>
+          <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>{dispatchHandoff?.state === "awaiting_operator_round" ? "This app does not trigger or simulate automatic matching. A verified operations team controls the first dispatch round." : "Open Jobs to refresh the protected request status. Dispatch rounds remain controlled by verified operations rules."}</Text></View>
           <PrimaryButton label="View synchronised jobs" icon="arrow-forward" onPress={() => { setTab("jobs"); setScreen("jobs"); }} />
         </ScrollView>
       );
@@ -941,8 +952,8 @@ export default function App() {
           <ScreenHeader title="Active job" onBack={goHome} />
           <View style={styles.trackingHeader}><Pill label={(selectedRequest?.status ?? "AWAITING DISPATCH").replaceAll("_", " ").toUpperCase()} tone="success" /><Text style={styles.trackingTime}>{selectedRequest ? selectedRequest.publicId : "No synchronised request"}</Text><Text style={styles.trackingAddress}>{syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel}</Text></View>
           <View style={styles.mapFrame}><View style={styles.mapGrid} /><View style={[styles.mapRoad, styles.roadOne]} /><View style={[styles.mapRoad, styles.roadTwo]} /><View style={styles.homePin}><AppIcon name="home" size={18} color={C.white} /></View><View style={styles.mapLegend}><View style={styles.legendDot} /><Text style={styles.legendText}>A live route and ETA appear only after a real technician is assigned and shares location securely.</Text></View></View>
-          <View style={styles.techSummary}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={21} color={C.white} /></View><View style={styles.techSummaryCopy}><Text style={styles.matchPerson}>{syncedRequestDetail?.technician?.displayName ?? "Technician pending"}</Text><Text style={styles.matchSpecialty}>{syncedRequestDetail?.technician ? "Verified assigned professional. Live route and ETA appear only after secure location sharing is enabled." : "HomeOS will show the verified accepted professional here after an offer is accepted."}</Text></View></View>
-          <View style={styles.timeline}><Timeline active={Boolean(selectedRequest)} label="Request created" detail={selectedRequest ? "Your protected request has been saved." : "No protected request is currently selected."} /><Timeline active={assignmentReached} label="Technician assignment" detail={assignmentReached ? "A verified technician has been assigned to this request." : "Verified dispatch will update this screen after an offer is accepted."} /><Timeline active={diagnosisReached} label="Diagnosis & quote" detail={diagnosisReached ? "The job has reached diagnosis or quote review." : "No work begins before you approve the quote."} /><Timeline active={completionReached} label="Completion" detail={completionReached ? "Completion is awaiting or has recorded the required protected workflow step." : "A one-time OTP is required to close the job."} /></View>
+          <View style={styles.techSummary}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={21} color={C.white} /></View><View style={styles.techSummaryCopy}><Text style={styles.matchPerson}>{syncedRequestDetail?.technician?.displayName ?? dispatchHandoff?.label ?? "Technician pending"}</Text><Text style={styles.matchSpecialty}>{syncedRequestDetail?.technician ? "Verified assigned professional. Live route and ETA appear only after secure location sharing is enabled." : dispatchHandoff?.message ?? "HomeOS will show the verified accepted professional here after an offer is accepted."}</Text></View></View>
+          <View style={styles.timeline}><Timeline active={Boolean(selectedRequest)} label="Request created" detail={selectedRequest ? "Your protected request has been saved." : "No protected request is currently selected."} /><Timeline active={assignmentReached} label="Technician assignment" detail={assignmentReached ? "A verified technician has been assigned to this request." : dispatchHandoff?.message ?? "Verified dispatch will update this screen after an offer is accepted."} /><Timeline active={diagnosisReached} label="Diagnosis & quote" detail={diagnosisReached ? "The job has reached diagnosis or quote review." : "No work begins before you approve the quote."} /><Timeline active={completionReached} label="Completion" detail={completionReached ? "Completion is awaiting or has recorded the required protected workflow step." : "A one-time OTP is required to close the job."} /></View>
         </ScrollView>
       );
     }

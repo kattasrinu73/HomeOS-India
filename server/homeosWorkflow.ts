@@ -24,6 +24,12 @@ export type DispatchCandidate = {
   verifiedSkill: boolean;
 };
 
+export type DispatchOfferSummary = {
+  round: number;
+  searchRadiusKm: number;
+  status: "offered" | "accepted" | "declined" | "expired";
+};
+
 export const technicianProgressTransitions = {
   en_route: "assigned",
   arrived: "en_route",
@@ -42,6 +48,56 @@ export function buildTechnicianPerformanceSummary(input: { assignedJobStatuses: 
     activeJobCount,
     confirmedPaymentCount: input.confirmedPaymentTotals.length,
     confirmedCustomerPaymentTotal: input.confirmedPaymentTotals.reduce((total, paymentTotal) => total + paymentTotal, 0),
+  };
+}
+
+export function buildCustomerDispatchHandoff(input: { requestStatus: ServiceJobStatus; offers: DispatchOfferSummary[] }) {
+  const latestRound = input.offers.length ? Math.max(...input.offers.map((offer) => offer.round)) : null;
+  const latestRoundOffers = latestRound === null ? [] : input.offers.filter((offer) => offer.round === latestRound);
+  const activeOfferCount = latestRoundOffers.filter((offer) => offer.status === "offered").length;
+  const searchRadiusKm = latestRoundOffers[0]?.searchRadiusKm ?? null;
+  const alreadyAssigned = ["assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid"].includes(input.requestStatus);
+
+  if (alreadyAssigned) {
+    return {
+      state: "technician_assigned" as const,
+      label: "Verified technician assigned",
+      message: "A verified technician has accepted this protected service request.",
+      round: latestRound,
+      searchRadiusKm,
+      activeOfferCount,
+    };
+  }
+
+  if (activeOfferCount > 0) {
+    return {
+      state: "offers_out" as const,
+      label: "Verified offers are out",
+      message: "The current operator-controlled dispatch round has been sent to eligible, verified technicians. This screen will update when a technician accepts.",
+      round: latestRound,
+      searchRadiusKm,
+      activeOfferCount,
+    };
+  }
+
+  if (input.requestStatus === "submitted" && input.offers.length === 0) {
+    return {
+      state: "awaiting_operator_round" as const,
+      label: "Operator dispatch pending",
+      message: "Your request is saved and awaits the first HomeOS operator-controlled verified dispatch round.",
+      round: null,
+      searchRadiusKm: null,
+      activeOfferCount: 0,
+    };
+  }
+
+  return {
+    state: "operator_review" as const,
+    label: "Operator dispatch review",
+    message: "The current dispatch round has no accepted technician. A HomeOS operator is reviewing the next safe dispatch step.",
+    round: latestRound,
+    searchRadiusKm,
+    activeOfferCount: 0,
   };
 }
 

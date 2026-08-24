@@ -36,6 +36,7 @@ import {
   canTechnicianAdvanceJob,
   technicianProgressTransitions,
   buildTechnicianPerformanceSummary,
+  buildCustomerDispatchHandoff,
 } from "./homeosWorkflow";
 
 const categories = ["electrical", "plumbing", "ac_appliances", "carpentry", "cleaning", "ro", "painting", "other"] as const;
@@ -327,7 +328,9 @@ export const homeosRouter = router({
         const [invoice] = await db.select().from(invoices).where(eq(invoices.serviceRequestId, request.id)).limit(1);
         const [warranty] = await db.select().from(warranties).where(eq(warranties.serviceRequestId, request.id)).limit(1);
         const proofs = await db.select().from(jobProofs).where(eq(jobProofs.serviceRequestId, request.id));
-        return { request, home: home ?? null, technician, quote: quote ?? null, quoteItems: quoteItemsForRequest, payment: payment ?? null, invoice: invoice ?? null, warranty: warranty ?? null, proofs };
+        const requestOffers = await db.select({ round: dispatchOffers.round, searchRadiusKm: dispatchOffers.searchRadiusKm, status: dispatchOffers.status }).from(dispatchOffers).where(eq(dispatchOffers.serviceRequestId, request.id));
+        const dispatchHandoff = buildCustomerDispatchHandoff({ requestStatus: request.status, offers: requestOffers });
+        return { request, home: home ?? null, technician, quote: quote ?? null, quoteItems: quoteItemsForRequest, payment: payment ?? null, invoice: invoice ?? null, warranty: warranty ?? null, proofs, dispatchHandoff };
       }),
     create: protectedProcedure
       .input(z.object({

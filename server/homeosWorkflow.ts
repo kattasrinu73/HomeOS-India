@@ -129,6 +129,11 @@ export function rankDispatchCandidates(candidates: DispatchCandidate[]): Array<D
     .sort((a, b) => b.score - a.score);
 }
 
+export function nextManualDispatchRadiusKm(latestRadiusKm: number | null): number | null {
+  const approvedManualRadii = [5, 10, 15, 20, 25];
+  return approvedManualRadii.find((radiusKm) => latestRadiusKm === null || radiusKm > latestRadiusKm) ?? null;
+}
+
 export function canStartWork(status: ServiceJobStatus, quoteApprovedAt: Date | null): boolean {
   return status === "quote_approved" && quoteApprovedAt !== null;
 }

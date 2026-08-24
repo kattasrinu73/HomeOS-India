@@ -108,3 +108,4 @@
 - [x] Require explicit protected operations assignment after a verified technician accepts a manual dispatch offer, with truthful pending-assignment states and focused transition coverage.
 - [x] Add a protected operations pricing-review queue that exposes persisted sent quotes, their itemised totals, request context, and technician identity without bypassing customer quote approval.
 - [x] Add an administrator-only unstarted-job cancellation action with a required reason, persisted audit evidence, offer closure, and customer notification.
+- [x] Add persisted next-radius guidance for manual operations dispatch rounds, with no automatic expansion or customer-selection claims.

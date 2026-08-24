@@ -241,6 +241,7 @@ describe("HomeOS protected workflow transitions", () => {
     expect(queue).toEqual([expect.objectContaining({
       id: 19,
       latestDispatchRound: expect.objectContaining({ round: 2, searchRadiusKm: 10, eligibleOfferCount: 2, outcome: "offers_created" }),
+      nextManualRadiusKm: 15,
       acceptedTechnicians: [{ offerId: 44, technician: { id: 31, displayName: "Verified technician", verificationStatus: "verified" } }],
     })]);
   });

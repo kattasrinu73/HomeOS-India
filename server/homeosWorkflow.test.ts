@@ -8,6 +8,7 @@ import {
   canStartWork,
   canTechnicianAdvanceJob,
   hashCompletionOtp,
+  nextManualDispatchRadiusKm,
   rankDispatchCandidates,
   thirtyDayWarrantyEnds,
   verifyCompletionOtp,
@@ -33,6 +34,13 @@ describe("HomeOS service workflow", () => {
 
     expect(ranked.map((candidate) => candidate.technicianId)).toEqual([12, 11]);
     expect(ranked[0]?.score).toBeGreaterThan(ranked[1]?.score ?? 0);
+  });
+
+  it("suggests the next approved radius from a persisted manual round without expanding automatically", () => {
+    expect(nextManualDispatchRadiusKm(null)).toBe(5);
+    expect(nextManualDispatchRadiusKm(5)).toBe(10);
+    expect(nextManualDispatchRadiusKm(17)).toBe(20);
+    expect(nextManualDispatchRadiusKm(25)).toBeNull();
   });
 
   it("requires an explicitly approved quote before work can start", () => {

@@ -40,6 +40,7 @@ import {
   buildTechnicianPerformanceSummary,
   buildCustomerDispatchHandoff,
   calculateHomeHealthScore,
+  nextManualDispatchRadiusKm,
 } from "./homeosWorkflow";
 
 const categories = ["electrical", "plumbing", "ac_appliances", "carpentry", "cleaning", "ro", "painting", "other"] as const;
@@ -855,6 +856,7 @@ export const homeosRouter = router({
             outcome: audit.outcome,
             createdAt: audit.createdAt,
           } : null,
+          nextManualRadiusKm: nextManualDispatchRadiusKm(audit?.searchRadiusKm ?? null),
           acceptedTechnicians: offers
             .filter((offer) => offer.serviceRequestId === request.id && offer.status === "accepted")
             .map((offer) => ({ offerId: offer.id, technician: acceptedTechnicianById.get(offer.technicianId) ?? null })),

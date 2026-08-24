@@ -5,7 +5,7 @@
 - [x] Apply the database migration and document the schema's safety-critical constraints.
 - [x] Build a premium native customer-app home experience with the exact primary CTA: “Tell us what's wrong”.
 - [x] Connect account access, Hyderabad location, persisted home address, home type, and appliance setup to the mobile app and backend.
-- [ ] Bind the customer home dashboard’s quick-service cards themselves to protected persisted record-derived data; manual maintenance reminders, appliance context, active-job, appliance/warranty, and 0–100 Home Health Score summaries are already record-derived.
+- [x] Bind the customer home dashboard’s quick-service cards themselves to protected persisted appliance records; manual maintenance reminders, active-job, appliance/warranty, and 0–100 Home Health Score summaries are also record-derived.
 - [x] Connect the AI-assisted Fix Anything flow to secure attachment upload and its backend LLM procedure.
 - [ ] Implement persisted controlled technician matching, sequential dispatch rounds, radius expansion, and customer selection logic.
 - [x] Complete the technician dashboard and job workflow with secure proof capture, persisted arrival/diagnosis/quote/completion state changes, earnings, and performance data.
@@ -110,3 +110,4 @@
 - [x] Add an administrator-only unstarted-job cancellation action with a required reason, persisted audit evidence, offer closure, and customer notification.
 - [x] Add persisted next-radius guidance for manual operations dispatch rounds, with no automatic expansion or customer-selection claims.
 - [x] Add protected manually created maintenance reminders and bind customer-home maintenance cards to persisted reminder and appliance records without background scheduling.
+- [x] Replace static web quick-service cards with persisted appliance-backed service shortcuts and a truthful no-appliance state.

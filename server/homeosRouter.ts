@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
   accountProfiles,
+  appliances,
   dispatchOffers,
   homes,
   invoices,
@@ -140,6 +141,33 @@ export const homeosRouter = router({
         await db.insert(homes).values({ ...input, ownerId: ctx.user.id, healthScore: 0 });
         const created = await db.select().from(homes).where(and(eq(homes.ownerId, ctx.user.id), eq(homes.label, input.label))).orderBy(desc(homes.id)).limit(1);
         return created[0];
+      }),
+  }),
+  appliances: router({
+    list: protectedProcedure
+      .input(z.object({ homeId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
+        if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot view appliances for this home." });
+        return db.select().from(appliances).where(eq(appliances.homeId, input.homeId)).orderBy(desc(appliances.createdAt));
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        homeId: z.number().int().positive(),
+        category: z.string().trim().min(2).max(80),
+        brand: z.string().trim().min(1).max(120).optional(),
+        model: z.string().trim().min(1).max(160).optional(),
+        installedYear: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
+        if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot add appliances to this home." });
+        await db.insert(appliances).values(input);
+        const [created] = await db.select().from(appliances).where(and(eq(appliances.homeId, input.homeId), eq(appliances.category, input.category))).orderBy(desc(appliances.id)).limit(1);
+        if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the appliance." });
+        return created;
       }),
   }),
   account: router({

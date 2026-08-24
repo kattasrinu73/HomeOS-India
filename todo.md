@@ -58,3 +58,5 @@
 - [ ] Extend AI assessment to use an uploaded issue attachment and test assessment/upload paths with and without an image.
 - [ ] Connect newly created requests to an actual dispatch-round operator flow, persist real customer selection where required, and test radius expansion plus offer outcomes.
 - [ ] Implement native OAuth session establishment and account-access UI, securely store the resulting HomeOS session token, and verify Passport document upload/listing on an authenticated Android device.
+- [ ] Keep Stripe sandbox claiming, provider-webhook confirmation, and live payment testing deferred until the owner explicitly requests activation; retain the existing checkout and invoice safeguards.
+- [x] Synchronise customer-owned appliance records in the native client, render them in Home and Passport, and create new records through the protected appliance contract.

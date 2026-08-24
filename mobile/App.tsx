@@ -88,6 +88,14 @@ type SyncedPassportDocument = {
   fileSize: number;
 };
 
+type SyncedAppliance = {
+  id: number;
+  category: string;
+  brand: string | null;
+  model: string | null;
+  installedYear: number | null;
+};
+
 type NativeRequestDetail = {
   request: SyncedServiceRequest;
   technician: { displayName: string } | null;
@@ -247,14 +255,19 @@ export default function App() {
   const [syncedHome, setSyncedHome] = useState<SyncedHome | null>(null);
   const [syncedRequests, setSyncedRequests] = useState<SyncedServiceRequest[]>([]);
   const [syncedDocuments, setSyncedDocuments] = useState<SyncedPassportDocument[]>([]);
+  const [syncedAppliances, setSyncedAppliances] = useState<SyncedAppliance[]>([]);
   const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
   const [nativeAssessment, setNativeAssessment] = useState<NativeAssessment | null>(null);
   const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
   const [nativeCreatingRequest, setNativeCreatingRequest] = useState(false);
   const [nativeDocumentUploading, setNativeDocumentUploading] = useState(false);
+  const [nativeApplianceSaving, setNativeApplianceSaving] = useState(false);
   const [nativeHomeSaving, setNativeHomeSaving] = useState(false);
   const [nativeHomeAddress, setNativeHomeAddress] = useState("");
   const [nativeHomeType, setNativeHomeType] = useState<"apartment" | "independent_house" | "villa" | "other">("apartment");
+  const [nativeApplianceCategory, setNativeApplianceCategory] = useState("");
+  const [nativeApplianceBrand, setNativeApplianceBrand] = useState("");
+  const [nativeApplianceModel, setNativeApplianceModel] = useState("");
   const [nativeLoginLoading, setNativeLoginLoading] = useState(false);
   const [nativeSyncStatus, setNativeSyncStatus] = useState<"loading" | "ready" | "signin_required" | "unavailable">("loading");
 
@@ -280,10 +293,14 @@ export default function App() {
       ]);
       setSyncedHome(homes[0] ?? null);
       setSyncedRequests(requests);
-      const documents = homes[0]
-        ? await (homeosApi as any).homeos.passport.listDocuments.query({ homeId: homes[0].id }) as SyncedPassportDocument[]
-        : [];
+      const [documents, applianceRecords] = homes[0]
+        ? await Promise.all([
+          (homeosApi as any).homeos.passport.listDocuments.query({ homeId: homes[0].id }) as Promise<SyncedPassportDocument[]>,
+          (homeosApi as any).homeos.appliances.list.query({ homeId: homes[0].id }) as Promise<SyncedAppliance[]>,
+        ])
+        : [[], []] as [SyncedPassportDocument[], SyncedAppliance[]];
       setSyncedDocuments(documents);
+      setSyncedAppliances(applianceRecords);
       const detail = requests[0]
         ? await (homeosApi as any).homeos.requests.detail.query({ publicId: requests[0].publicId }) as NativeRequestDetail
         : null;
@@ -293,6 +310,7 @@ export default function App() {
       setSyncedHome(null);
       setSyncedRequests([]);
       setSyncedDocuments([]);
+      setSyncedAppliances([]);
       setSyncedRequestDetail(null);
       setNativeSyncStatus("signin_required");
     }
@@ -420,6 +438,7 @@ export default function App() {
     setSyncedHome(null);
     setSyncedRequests([]);
     setSyncedDocuments([]);
+    setSyncedAppliances([]);
     setSyncedRequestDetail(null);
     setNativeSyncStatus("signin_required");
   };
@@ -451,6 +470,36 @@ export default function App() {
       Alert.alert("Home setup unavailable", "HomeOS could not save this protected home record right now. Please try again.");
     } finally {
       setNativeHomeSaving(false);
+    }
+  };
+
+  const saveNativeAppliance = async () => {
+    const category = nativeApplianceCategory.trim();
+    if (!syncedHome || nativeSyncStatus !== "ready") {
+      Alert.alert("Sign in required", "Sign in and save a HomeOS home before adding protected appliance records.");
+      return;
+    }
+    if (category.length < 2) {
+      Alert.alert("Add an appliance type", "Enter a clear appliance type, such as AC, refrigerator, or water purifier.");
+      return;
+    }
+    setNativeApplianceSaving(true);
+    try {
+      await (homeosApi as any).homeos.appliances.create.mutate({
+        homeId: syncedHome.id,
+        category,
+        ...(nativeApplianceBrand.trim() ? { brand: nativeApplianceBrand.trim() } : {}),
+        ...(nativeApplianceModel.trim() ? { model: nativeApplianceModel.trim() } : {}),
+      });
+      setNativeApplianceCategory("");
+      setNativeApplianceBrand("");
+      setNativeApplianceModel("");
+      await refreshNativeHome();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Appliance unavailable", "HomeOS could not save this protected appliance record right now. Please try again.");
+    } finally {
+      setNativeApplianceSaving(false);
     }
   };
 
@@ -608,9 +657,9 @@ export default function App() {
 
           <SectionTitle title="Your home" />
           <View style={styles.panel}>
-            <Row icon="calendar-outline" title="Maintenance reminders" detail="No synchronised reminders yet. Saved appliance maintenance will appear after account sync." onPress={() => startFix("AC & appliances")} />
+            <Row icon="calendar-outline" title={`Saved appliances${syncedAppliances.length ? ` · ${syncedAppliances.length}` : ""}`} detail={syncedAppliances.length ? syncedAppliances.slice(0, 2).map((appliance) => [appliance.brand, appliance.model, appliance.category].filter(Boolean).join(" ")).join(" · ") : nativeSyncStatus === "signin_required" ? "Sign in to view your protected appliance records." : "Add appliances during your saved-home setup to track service history."} onPress={() => startFix("AC & appliances")} />
             <View style={styles.panelLine} />
-            <Row icon="shield-checkmark-outline" title="Active warranties" detail="No synchronised warranty record yet." onPress={() => setScreen("passport")} />
+            <Row icon="shield-checkmark-outline" title="Active warranties" detail={syncedRequestDetail?.warranty ? `Active until ${new Date(syncedRequestDetail.warranty.endsAt).toLocaleDateString("en-IN")}` : "No active warranty record for your latest synchronised service."} onPress={() => setScreen("passport")} />
           </View>
           <View style={styles.safetyNote}><AppIcon name="information-circle-outline" size={18} color={C.moss} /><Text style={styles.safetyText}>For sparks, gas smells, or a major leak, use Emergency help and follow the safety guidance first.</Text></View>
         </ScrollView>
@@ -759,7 +808,17 @@ export default function App() {
           <View style={styles.panel}>{syncedDocuments.length ? syncedDocuments.map((document, index) => <View key={document.id}><Row icon="document-attach-outline" title={document.label} detail={`${document.documentType.replaceAll("_", " ")} · ${Math.ceil(document.fileSize / 1024)} KB`} />{index < syncedDocuments.length - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="document-outline" title="No Passport documents synchronised" detail={nativeSyncStatus === "signin_required" ? "Sign in to upload and view protected home documents." : "Add invoices, warranty papers, installation records, and service documents."} />}</View>
           <Press onPress={choosePassportDocument} disabled={nativeDocumentUploading} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeDocumentUploading ? "Securing document…" : "Add Passport document"}</Text><AppIcon name="document-attach-outline" size={18} /></Press>
           <SectionTitle title="Your appliances" />
-          <View style={styles.applianceCard}><View style={styles.applianceIcon}><AppIcon name="home-outline" size={25} /></View><View style={styles.applianceCopy}><Text style={styles.rowTitle}>No appliances synchronised</Text><Text style={styles.rowDetail}>Save appliance details in your signed-in HomeOS account to build this record.</Text></View><Press onPress={() => setOnboardingVisible(true)} style={styles.roundLink}><AppIcon name="add" size={19} /></Press></View>
+          {syncedAppliances.length ? syncedAppliances.map((appliance) => <View key={appliance.id} style={styles.applianceCard}><View style={styles.applianceIcon}><AppIcon name="home-outline" size={25} /></View><View style={styles.applianceCopy}><Text style={styles.rowTitle}>{[appliance.brand, appliance.model].filter(Boolean).join(" ") || appliance.category.replaceAll("_", " ")}</Text><Text style={styles.rowDetail}>{[appliance.category.replaceAll("_", " "), appliance.installedYear ? `Installed ${appliance.installedYear}` : null].filter(Boolean).join(" · ")}</Text></View></View>) : <View style={styles.applianceCard}><View style={styles.applianceIcon}><AppIcon name="home-outline" size={25} /></View><View style={styles.applianceCopy}><Text style={styles.rowTitle}>No appliances synchronised</Text><Text style={styles.rowDetail}>{nativeSyncStatus === "signin_required" ? "Sign in to view protected appliance records." : "Add appliance details to build this protected home record."}</Text></View></View>}
+          <SectionTitle title="Add an appliance" />
+          <View style={styles.inputPanel}>
+            <Text style={styles.inputLabel}>Appliance type</Text>
+            <TextInput value={nativeApplianceCategory} onChangeText={setNativeApplianceCategory} placeholder="For example, AC or water purifier" placeholderTextColor="#98958D" style={[styles.textArea, { minHeight: 42, paddingVertical: 0 }]} />
+            <View style={styles.panelLine} />
+            <Text style={[styles.inputLabel, { marginTop: 14 }]}>Brand and model (optional)</Text>
+            <TextInput value={nativeApplianceBrand} onChangeText={setNativeApplianceBrand} placeholder="Brand" placeholderTextColor="#98958D" style={[styles.textArea, { minHeight: 38, paddingVertical: 0 }]} />
+            <TextInput value={nativeApplianceModel} onChangeText={setNativeApplianceModel} placeholder="Model" placeholderTextColor="#98958D" style={[styles.textArea, { minHeight: 38, paddingVertical: 0 }]} />
+            <View style={{ marginTop: 12 }}><PrimaryButton disabled={nativeApplianceSaving || nativeSyncStatus !== "ready"} label={nativeApplianceSaving ? "Saving appliance…" : "Save appliance"} icon="add" onPress={saveNativeAppliance} /></View>
+          </View>
         </ScrollView>
       );
     }

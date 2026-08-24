@@ -254,6 +254,7 @@ export default function App() {
   const [homeStep, setHomeStep] = useState(0);
   const [syncedHome, setSyncedHome] = useState<SyncedHome | null>(null);
   const [syncedRequests, setSyncedRequests] = useState<SyncedServiceRequest[]>([]);
+  const [selectedRequestPublicId, setSelectedRequestPublicId] = useState<string | null>(null);
   const [syncedDocuments, setSyncedDocuments] = useState<SyncedPassportDocument[]>([]);
   const [syncedAppliances, setSyncedAppliances] = useState<SyncedAppliance[]>([]);
   const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
@@ -279,8 +280,9 @@ export default function App() {
     ["Taxes", 0],
   ] as const;
   const invoiceTotal = invoiceLines.reduce((total, [, amount]) => total + amount, 0);
+  const selectedRequest = syncedRequests.find((request) => request.publicId === selectedRequestPublicId) ?? syncedRequests[0] ?? null;
 
-  const refreshNativeHome = async () => {
+  const refreshNativeHome = async (requestedPublicId?: string) => {
     if (!homeosApiConfigured()) {
       setNativeSyncStatus("unavailable");
       return;
@@ -301,14 +303,17 @@ export default function App() {
         : [[], []] as [SyncedPassportDocument[], SyncedAppliance[]];
       setSyncedDocuments(documents);
       setSyncedAppliances(applianceRecords);
-      const detail = requests[0]
-        ? await (homeosApi as any).homeos.requests.detail.query({ publicId: requests[0].publicId }) as NativeRequestDetail
+      const detailRequest = requests.find((request) => request.publicId === (requestedPublicId ?? selectedRequestPublicId)) ?? requests[0];
+      if (detailRequest) setSelectedRequestPublicId(detailRequest.publicId);
+      const detail = detailRequest
+        ? await (homeosApi as any).homeos.requests.detail.query({ publicId: detailRequest.publicId }) as NativeRequestDetail
         : null;
       setSyncedRequestDetail(detail);
       setNativeSyncStatus("ready");
     } catch {
       setSyncedHome(null);
       setSyncedRequests([]);
+      setSelectedRequestPublicId(null);
       setSyncedDocuments([]);
       setSyncedAppliances([]);
       setSyncedRequestDetail(null);
@@ -549,6 +554,8 @@ export default function App() {
         estimateMax: nativeAssessment.estimateMax,
       }) as SyncedServiceRequest;
       setSyncedRequests((requests) => [request, ...requests.filter((existing) => existing.id !== request.id)]);
+      setSelectedRequestPublicId(request.publicId);
+      void refreshNativeHome(request.publicId);
       setJobStatus("submitted");
       setScreen("matches");
     } catch {
@@ -634,9 +641,9 @@ export default function App() {
             <Press onPress={() => setScreen("passport")} style={styles.roundLink}><AppIcon name="arrow-forward" size={18} /></Press>
           </View>
 
-          {syncedRequests[0] ? <Press onPress={() => setScreen("tracking")} style={styles.homeActiveJob}>
-            <View style={styles.homeActiveJobTop}><Pill label={syncedRequests[0].status.replaceAll("_", " ").toUpperCase()} tone="success" /><Text style={styles.homeActiveJobEta}>{syncedRequests[0].urgency} priority</Text></View>
-            <View style={styles.homeActiveJobBody}><View style={styles.homeActiveJobIcon}><AppIcon name="construct-outline" size={21} color={C.white} /></View><View style={styles.rowCopy}><Text style={styles.homeActiveJobTitle}>{syncedRequests[0].category.replaceAll("_", " ")}</Text><Text style={styles.homeActiveJobDetail}>{syncedRequests[0].publicId} · Tap to view service status</Text></View><AppIcon name="chevron-forward" size={19} color={C.white} /></View>
+          {selectedRequest ? <Press onPress={() => { setSelectedRequestPublicId(selectedRequest.publicId); void refreshNativeHome(selectedRequest.publicId); setScreen("tracking"); }} style={styles.homeActiveJob}>
+            <View style={styles.homeActiveJobTop}><Pill label={selectedRequest.status.replaceAll("_", " ").toUpperCase()} tone="success" /><Text style={styles.homeActiveJobEta}>{selectedRequest.urgency} priority</Text></View>
+            <View style={styles.homeActiveJobBody}><View style={styles.homeActiveJobIcon}><AppIcon name="construct-outline" size={21} color={C.white} /></View><View style={styles.rowCopy}><Text style={styles.homeActiveJobTitle}>{selectedRequest.category.replaceAll("_", " ")}</Text><Text style={styles.homeActiveJobDetail}>{selectedRequest.publicId} · Tap to view service status</Text></View><AppIcon name="chevron-forward" size={19} color={C.white} /></View>
           </Press> : <Press onPress={() => startFix()} style={styles.homeActiveJob}><View style={styles.homeActiveJobTop}><Pill label="NO ACTIVE REQUEST" tone="success" /><Text style={styles.homeActiveJobEta}>Start when ready</Text></View><View style={styles.homeActiveJobBody}><View style={styles.homeActiveJobIcon}><AppIcon name="add" size={21} color={C.white} /></View><View style={styles.rowCopy}><Text style={styles.homeActiveJobTitle}>Tell us what’s wrong</Text><Text style={styles.homeActiveJobDetail}>A saved service request will appear here after it is synchronised.</Text></View><AppIcon name="chevron-forward" size={19} color={C.white} /></View></Press>}
 
           <SectionTitle title="Quick services" action="View all" />
@@ -716,7 +723,7 @@ export default function App() {
           <ScreenHeader title="Find a qualified professional" onBack={() => setScreen("analysis")} />
           <Text style={styles.flowTitle}>Controlled verified matching.</Text>
           <Text style={styles.flowSubtitle}>The signed-in HomeOS service creates a request, then dispatches real eligible professionals by verified skill, availability, distance, and reliability.</Text>
-          <View style={[styles.matchCard, styles.matchCardSelected]}><View style={styles.matchTop}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={24} color={C.white} /></View><View style={styles.matchName}><Text style={styles.matchPerson}>{syncedRequests[0] ? syncedRequests[0].publicId : "Awaiting secure dispatch"}</Text><Text style={styles.matchSpecialty}>{syncedRequests[0] ? `${syncedRequests[0].category.replaceAll("_", " ")} request is ${syncedRequests[0].status.replaceAll("_", " ")}.` : "No technician, rating, availability, or ETA is shown until it is returned by the protected matching service."}</Text></View></View><Text style={styles.matchFoot}>HomeOS will show the real accepted technician after a verified offer is accepted. No fabricated professional details are displayed.</Text></View>
+          <View style={[styles.matchCard, styles.matchCardSelected]}><View style={styles.matchTop}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={24} color={C.white} /></View><View style={styles.matchName}><Text style={styles.matchPerson}>{selectedRequest ? selectedRequest.publicId : "Awaiting secure dispatch"}</Text><Text style={styles.matchSpecialty}>{selectedRequest ? `${selectedRequest.category.replaceAll("_", " ")} request is ${selectedRequest.status.replaceAll("_", " ")}.` : "No technician, rating, availability, or ETA is shown until it is returned by the protected matching service."}</Text></View></View><Text style={styles.matchFoot}>HomeOS will show the real accepted technician after a verified offer is accepted. No fabricated professional details are displayed.</Text></View>
           <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Open Jobs to refresh the protected request status. Dispatch rounds are controlled by verified operations rules.</Text></View>
           <PrimaryButton label="View synchronised jobs" icon="arrow-forward" onPress={() => { setTab("jobs"); setScreen("jobs"); }} />
         </ScrollView>
@@ -727,10 +734,10 @@ export default function App() {
       return (
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Active job" onBack={goHome} />
-          <View style={styles.trackingHeader}><Pill label={(syncedRequests[0]?.status ?? "AWAITING DISPATCH").replaceAll("_", " ").toUpperCase()} tone="success" /><Text style={styles.trackingTime}>{syncedRequests[0] ? syncedRequests[0].publicId : "No synchronised request"}</Text><Text style={styles.trackingAddress}>{syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel}</Text></View>
+          <View style={styles.trackingHeader}><Pill label={(selectedRequest?.status ?? "AWAITING DISPATCH").replaceAll("_", " ").toUpperCase()} tone="success" /><Text style={styles.trackingTime}>{selectedRequest ? selectedRequest.publicId : "No synchronised request"}</Text><Text style={styles.trackingAddress}>{syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel}</Text></View>
           <View style={styles.mapFrame}><View style={styles.mapGrid} /><View style={[styles.mapRoad, styles.roadOne]} /><View style={[styles.mapRoad, styles.roadTwo]} /><View style={styles.homePin}><AppIcon name="home" size={18} color={C.white} /></View><View style={styles.mapLegend}><View style={styles.legendDot} /><Text style={styles.legendText}>A live route and ETA appear only after a real technician is assigned and shares location securely.</Text></View></View>
           <View style={styles.techSummary}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={21} color={C.white} /></View><View style={styles.techSummaryCopy}><Text style={styles.matchPerson}>Technician pending</Text><Text style={styles.matchSpecialty}>HomeOS will show the verified accepted professional here.</Text></View></View>
-          <View style={styles.timeline}><Timeline active={Boolean(syncedRequests[0])} label="Request created" detail="Your protected request has been saved." /><Timeline label="Technician assignment" detail="Verified dispatch will update this screen after an offer is accepted." /><Timeline label="Diagnosis & quote" detail="No work begins before you approve the quote." /><Timeline label="Completion" detail="A one-time OTP is required to close the job." /></View>
+          <View style={styles.timeline}><Timeline active={Boolean(selectedRequest)} label="Request created" detail="Your protected request has been saved." /><Timeline label="Technician assignment" detail="Verified dispatch will update this screen after an offer is accepted." /><Timeline label="Diagnosis & quote" detail="No work begins before you approve the quote." /><Timeline label="Completion" detail="A one-time OTP is required to close the job." /></View>
         </ScrollView>
       );
     }
@@ -791,7 +798,7 @@ export default function App() {
       return (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Your jobs" action={<Pill label={`${syncedRequests.length} ACTIVE`} tone="success" />} />
-          {nativeSyncStatus === "loading" ? <View style={styles.panel}><Row icon="sync-outline" title="Loading saved jobs" detail="Checking your protected HomeOS records." /></View> : syncedRequests.length ? syncedRequests.map((request) => <Press key={request.id} onPress={() => setScreen("tracking")} style={styles.activeJobCard}><View style={styles.activeJobTop}><Pill label={request.status.replaceAll("_", " ").toUpperCase()} tone="success" /><AppIcon name="chevron-forward" size={18} color={C.white} /></View><Text style={styles.activeJobTitle}>{request.category.replaceAll("_", " ")}</Text><Text style={styles.activeJobDetail}>{request.publicId} · {request.urgency} priority</Text><View style={styles.activeJobLine} /><Text style={styles.activeJobAction}>{request.description}</Text></Press>) : <View style={styles.panel}><Row icon="calendar-outline" title="No synchronised jobs" detail={nativeSyncStatus === "signin_required" ? "Sign in to load your protected HomeOS service records." : "New service requests will appear here after they are synchronised."} /></View>}
+          {nativeSyncStatus === "loading" ? <View style={styles.panel}><Row icon="sync-outline" title="Loading saved jobs" detail="Checking your protected HomeOS records." /></View> : syncedRequests.length ? syncedRequests.map((request) => <Press key={request.id} onPress={() => { setSelectedRequestPublicId(request.publicId); void refreshNativeHome(request.publicId); setScreen("tracking"); }} style={styles.activeJobCard}><View style={styles.activeJobTop}><Pill label={request.status.replaceAll("_", " ").toUpperCase()} tone="success" /><AppIcon name="chevron-forward" size={18} color={C.white} /></View><Text style={styles.activeJobTitle}>{request.category.replaceAll("_", " ")}</Text><Text style={styles.activeJobDetail}>{request.publicId} · {request.urgency} priority</Text><View style={styles.activeJobLine} /><Text style={styles.activeJobAction}>{request.description}</Text></Press>) : <View style={styles.panel}><Row icon="calendar-outline" title="No synchronised jobs" detail={nativeSyncStatus === "signin_required" ? "Sign in to load your protected HomeOS service records." : "New service requests will appear here after they are synchronised."} /></View>}
         </ScrollView>
       );
     }

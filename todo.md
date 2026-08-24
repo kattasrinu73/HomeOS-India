@@ -60,3 +60,4 @@
 - [ ] Implement native OAuth session establishment and account-access UI, securely store the resulting HomeOS session token, and verify Passport document upload/listing on an authenticated Android device.
 - [ ] Keep Stripe sandbox claiming, provider-webhook confirmation, and live payment testing deferred until the owner explicitly requests activation; retain the existing checkout and invoice safeguards.
 - [x] Synchronise customer-owned appliance records in the native client, render them in Home and Passport, and create new records through the protected appliance contract.
+- [x] Let the native customer select a synchronised service request and load that request’s protected detail instead of always using the first record.

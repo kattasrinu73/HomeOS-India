@@ -1,0 +1,16 @@
+{
+  "uuid": "homeos-mobile-vitest-20260824",
+  "historyId": "homeos-mobile-vitest-suite",
+  "testCaseId": "homeos-mobile-vitest-suite",
+  "name": "Expo workflow suite",
+  "fullName": "HomeOS automated validation.Expo workflow suite",
+  "status": "passed",
+  "stage": "finished",
+  "description": "Vitest completed with 8 passing tests across the native workflow and end-to-end workflow test files.",
+  "start": 1787563923346,
+  "stop": 1787563924346,
+  "labels": [
+    { "name": "suite", "value": "Native validation" },
+    { "name": "framework", "value": "Vitest" }
+  ]
+}

@@ -101,3 +101,5 @@
 - [x] Recompute Home Health Score from current protected records on home reads so expired warranties cannot leave a stale persisted score, with focused event and expiry-sensitive coverage.
 - [x] Add router-level tests proving Home Health Score recalculates after protected appliance creation, technician OTP completion, and provider-confirmed warranty activation.
 - [x] Replace static native home warranty and maintenance copy with protected record-derived summary states and clear no-record messaging.
+- [x] Generate and deliver an Allure-compatible testing report from the latest automated HomeOS validation, with device and provider verification boundaries stated clearly.
+- [x] Record the successful Android APK containing record-derived native Home summaries and revise the Allure-compatible report from build-pending to build-passed.

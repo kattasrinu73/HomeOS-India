@@ -1,0 +1,19 @@
+{
+  "uuid": "homeos-device-provider-pending-20260824",
+  "historyId": "homeos-device-provider-pending",
+  "testCaseId": "homeos-device-provider-pending",
+  "name": "Physical-device and payment-provider verification",
+  "fullName": "HomeOS external verification.Physical-device and payment-provider verification",
+  "status": "skipped",
+  "statusDetails": {
+    "message": "Physical Android OAuth, device location and document-picker behavior require device evidence. Stripe payment confirmation remains intentionally deferred by owner request."
+  },
+  "stage": "finished",
+  "description": "These checks are explicitly excluded from automated pass counts.",
+  "start": 1787563926346,
+  "stop": 1787563927346,
+  "labels": [
+    { "name": "suite", "value": "External verification required" },
+    { "name": "framework", "value": "Device and provider" }
+  ]
+}

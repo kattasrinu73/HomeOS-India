@@ -1,0 +1,16 @@
+{
+  "uuid": "homeos-server-typescript-20260824",
+  "historyId": "homeos-server-typescript-check",
+  "testCaseId": "homeos-server-typescript-check",
+  "name": "Server and web TypeScript check",
+  "fullName": "HomeOS automated validation.Server and web TypeScript check",
+  "status": "passed",
+  "stage": "finished",
+  "description": "pnpm check completed successfully in the HomeOS web/server project.",
+  "start": 1787563914346,
+  "stop": 1787563915346,
+  "labels": [
+    { "name": "suite", "value": "Web and server validation" },
+    { "name": "framework", "value": "TypeScript" }
+  ]
+}

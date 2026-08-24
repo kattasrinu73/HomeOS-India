@@ -1,0 +1,16 @@
+{
+  "uuid": "homeos-mobile-typescript-20260824",
+  "historyId": "homeos-mobile-typescript-check",
+  "testCaseId": "homeos-mobile-typescript-check",
+  "name": "Expo native TypeScript check",
+  "fullName": "HomeOS automated validation.Expo native TypeScript check",
+  "status": "passed",
+  "stage": "finished",
+  "description": "mobile: pnpm check completed successfully.",
+  "start": 1787563922346,
+  "stop": 1787563923346,
+  "labels": [
+    { "name": "suite", "value": "Native validation" },
+    { "name": "framework", "value": "Expo and TypeScript" }
+  ]
+}

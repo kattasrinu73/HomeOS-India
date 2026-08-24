@@ -1,0 +1,16 @@
+{
+  "uuid": "homeos-web-production-build-20260824",
+  "historyId": "homeos-web-production-build",
+  "testCaseId": "homeos-web-production-build",
+  "name": "Production web and server bundle",
+  "fullName": "HomeOS automated validation.Production web and server bundle",
+  "status": "passed",
+  "stage": "finished",
+  "description": "pnpm build completed successfully, producing the Vite web output and bundled Node server output.",
+  "start": 1787563918346,
+  "stop": 1787563922346,
+  "labels": [
+    { "name": "suite", "value": "Web and server validation" },
+    { "name": "framework", "value": "Vite and esbuild" }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "uuid": "homeos-mobile-web-export-20260824",
+  "historyId": "homeos-mobile-web-export",
+  "testCaseId": "homeos-mobile-web-export",
+  "name": "Expo web export",
+  "fullName": "HomeOS automated validation.Expo web export",
+  "status": "passed",
+  "stage": "finished",
+  "description": "Expo exported the native client for web successfully after the current protected workflow changes.",
+  "start": 1787563924346,
+  "stop": 1787563925346,
+  "labels": [
+    { "name": "suite", "value": "Native validation" },
+    { "name": "framework", "value": "Expo" }
+  ]
+}

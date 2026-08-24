@@ -297,11 +297,43 @@ describe("HomeOS protected workflow transitions", () => {
     })]);
   });
 
+  it("returns an administrator-only persisted sent-quote review queue with itemised totals and request context", async () => {
+    dbTestState.selections.push(
+      [{ id: 8, serviceRequestId: 19, technicianId: 31, status: "sent", reason: "Replace damaged part", createdAt: new Date("2026-08-24T08:00:00.000Z"), updatedAt: new Date("2026-08-24T08:05:00.000Z") }],
+      [{ id: 19, publicId: "HOS-QUOTE-19", category: "plumbing", urgency: "high", status: "quote_pending" }],
+      [{ id: 31, displayName: "Verified technician", verificationStatus: "verified" }],
+      [
+        { id: 1, quoteId: 8, itemType: "visit_fee", label: "Visit fee", amount: 199 },
+        { id: 2, quoteId: 8, itemType: "part", label: "Valve", amount: 850 },
+      ],
+    );
+
+    const review = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).operations.quoteReview();
+
+    expect(review).toEqual([expect.objectContaining({
+      id: 8,
+      status: "sent",
+      total: 1049,
+      request: { id: 19, publicId: "HOS-QUOTE-19", category: "plumbing", urgency: "high", status: "quote_pending" },
+      technician: { id: 31, displayName: "Verified technician", verificationStatus: "verified" },
+      items: [
+        { id: 1, quoteId: 8, itemType: "visit_fee", label: "Visit fee", amount: 199 },
+        { id: 2, quoteId: 8, itemType: "part", label: "Valve", amount: 850 },
+      ],
+    })]);
+  });
+
   it("forbids a regular account from confirming an accepted dispatch offer", async () => {
     await expect(homeosRouter.createCaller(createAuthenticatedContext()).operations.assignAcceptedOffer({ offerId: 44 }))
       .rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(dbTestState.selections).toHaveLength(0);
     expect(dbTestState.updates).toHaveLength(0);
+  });
+
+  it("forbids a regular account from accessing the operations quote review queue", async () => {
+    await expect(homeosRouter.createCaller(createAuthenticatedContext()).operations.quoteReview())
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(dbTestState.selections).toHaveLength(0);
   });
 
   it("derives operations analytics from persisted request, latest quote, confirmed payment, and active-warranty records", async () => {

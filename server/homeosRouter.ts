@@ -875,6 +875,32 @@ export const homeosRouter = router({
         await db.insert(notificationRecords).values({ userId: request.customerId, serviceRequestId: request.id, event: "technician_assigned", title: "Your technician is confirmed", body: "A HomeOS operator confirmed your verified technician assignment. The technician can now prepare to travel." });
         return { success: true, status: "assigned" as const, serviceRequestId: request.id, technicianId: technician.id };
       }),
+    quoteReview: adminProcedure.query(async () => {
+      const db = await databaseOrThrow();
+      const pendingQuotes = await db.select().from(quotes).where(eq(quotes.status, "sent")).orderBy(desc(quotes.updatedAt));
+      if (!pendingQuotes.length) return [];
+      const [requestRows, technicianRows, itemRows] = await Promise.all([
+        db.select({ id: serviceRequests.id, publicId: serviceRequests.publicId, category: serviceRequests.category, urgency: serviceRequests.urgency, status: serviceRequests.status }).from(serviceRequests).where(inArray(serviceRequests.id, pendingQuotes.map((quote) => quote.serviceRequestId))),
+        db.select({ id: technicians.id, displayName: technicians.displayName, verificationStatus: technicians.verificationStatus }).from(technicians).where(inArray(technicians.id, pendingQuotes.map((quote) => quote.technicianId))),
+        db.select({ id: quoteItems.id, quoteId: quoteItems.quoteId, itemType: quoteItems.itemType, label: quoteItems.label, amount: quoteItems.amount }).from(quoteItems).where(inArray(quoteItems.quoteId, pendingQuotes.map((quote) => quote.id))),
+      ]);
+      const requestById = new Map(requestRows.map((request) => [request.id, request]));
+      const technicianById = new Map(technicianRows.map((technician) => [technician.id, technician]));
+      return pendingQuotes.map((quote) => {
+        const items = itemRows.filter((item) => item.quoteId === quote.id);
+        return {
+          id: quote.id,
+          reason: quote.reason,
+          status: quote.status,
+          createdAt: quote.createdAt,
+          updatedAt: quote.updatedAt,
+          request: requestById.get(quote.serviceRequestId) ?? null,
+          technician: technicianById.get(quote.technicianId) ?? null,
+          items,
+          total: items.reduce((total, item) => total + item.amount, 0),
+        };
+      });
+    }),
     jobBoard: adminProcedure.query(async () => {
       const db = await databaseOrThrow();
       const jobs = await db.select().from(serviceRequests).where(inArray(serviceRequests.status, ["assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending"])).orderBy(desc(serviceRequests.updatedAt));

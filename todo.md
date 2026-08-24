@@ -14,7 +14,7 @@
 - [x] Implement itemised payment records for visit fee, parts, labour, taxes, platform fee, payment method, and wallet credits.
 - [ ] Bind generated and persisted digital invoices containing job ID, technician identity, parts, labour, taxes, payment information, and an explicit 30-day service warranty to the mobile client.
 - [ ] Populate the Home Service Passport from completed work records, proof, invoices, appliance history, and active 30-day warranties.
-- [ ] Build the operations dashboard with monitoring, dispatch oversight, technician verification, pricing, job management, and analytics views.
+- [ ] Add a distinct protected operations job-management view with persisted job actions and safeguards beyond monitoring and assignment confirmation.
 - [x] Implement in-app notification records and status updates for customer and technician job milestones, payment, warranty, and maintenance reminders.
 - [x] Build a live-tracking experience with a route/ETA interface that can later connect to real location providers.
 - [x] Use secure storage patterns for uploaded issue photos and job-proof attachments.
@@ -23,7 +23,7 @@
 - [ ] Verify the desktop and mobile user interfaces, resolve errors, and complete a final project checkpoint.
 - [x] Build the customer-facing product as a native-feeling mobile application rather than a public website.
 - [ ] Build the technician-facing product as a role-specific mobile application connected to the shared service backend.
-- [ ] Retain a web-based operations console only for internal dispatch, verification, pricing, and analytics workflows.
+- [x] Retain a protected web-based operations console for internal dispatch, verification, pricing, and analytics workflows alongside the customer web preview.
 - [x] Configure mobile navigation, device permissions, attachment capture, location interfaces, and responsive interaction states for Android and iOS delivery.
 - [x] Replace the default web-template placeholder in the project preview with a polished HomeOS customer preview that visibly demonstrates the product journey.
 - [x] Build complete visible customer-app navigation for onboarding, home, jobs, service passport, account, and Fix Anything.
@@ -106,3 +106,4 @@
 - [x] Add protected record-derived operations job-state monitoring and service analytics without mock metrics or automatic dispatch.
 - [x] Add a protected operations analytics contract and console view with persisted job-status, quote-funnel, completion, payment, and active-warranty counts, with focused record-derived tests.
 - [x] Require explicit protected operations assignment after a verified technician accepts a manual dispatch offer, with truthful pending-assignment states and focused transition coverage.
+- [x] Add a protected operations pricing-review queue that exposes persisted sent quotes, their itemised totals, request context, and technician identity without bypassing customer quote approval.

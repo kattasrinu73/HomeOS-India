@@ -6,7 +6,7 @@
   "fullName": "HomeOS automated validation.Protected server workflow suite",
   "status": "passed",
   "stage": "finished",
-  "description": "Vitest completed with 38 passing tests across four test files, covering protected routes, workflow helpers, manual dispatch, explicit operations assignment, OTP, AI assessment, customer invoice ownership, warranties, and Home Health Score recalculation.",
+  "description": "Vitest completed with 40 passing tests across four test files, covering protected routes, workflow helpers, manual dispatch, explicit operations assignment, itemised quote review, OTP, AI assessment, customer invoice ownership, warranties, and Home Health Score recalculation.",
   "start": 1787565322000,
   "stop": 1787565325000,
   "labels": [

@@ -637,9 +637,7 @@ export default function App() {
   };
 
   const pay = () => {
-    setJobStatus("paid");
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setScreen("invoice");
+    Alert.alert("Payment provider pending", "Secure payment collection and confirmation are not activated for this pilot yet. HomeOS will not mark this service paid or issue an invoice until a provider confirms the payment.");
   };
 
   const renderCustomerScreen = () => {
@@ -815,7 +813,7 @@ export default function App() {
           <SectionTitle title="Pay with" />
           {["UPI", "Card", "Wallet credits"].map((method) => <Press key={method} onPress={() => setPaymentMethod(method)} style={[styles.payMethod, paymentMethod === method && styles.payMethodSelected]}><View style={styles.payMethodIcon}><AppIcon name={method === "UPI" ? "qr-code-outline" : method === "Card" ? "card-outline" : "wallet-outline"} size={20} /></View><Text style={styles.payMethodText}>{method}</Text>{paymentMethod === method ? <AppIcon name="checkmark-circle" size={21} color={C.coral} /> : <View style={styles.radioEmpty} />}</Press>)}
           <View style={styles.guidanceBox}><AppIcon name="lock-closed-outline" size={19} color={C.success} /><Text style={styles.guidanceText}>Live payment collection is enabled after your UPI and card payment provider has been securely connected.</Text></View>
-          <PrimaryButton label={`Pay ${formatIndianRupees(invoiceTotal)}`} icon="lock-closed-outline" onPress={pay} />
+          <PrimaryButton label="Payment provider pending activation" icon="lock-closed-outline" onPress={pay} />
         </ScrollView>
       );
     }

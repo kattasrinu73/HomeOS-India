@@ -68,3 +68,4 @@
 - [x] Add protected native technician transitions from assigned through en route, arrival, and diagnosis so an itemised quote can be created at a valid server state.
 - [x] Render the assigned technician identity from the selected protected request detail in native customer tracking instead of a generic pending placeholder.
 - [x] Extract and test the permitted technician progress sequence used by the protected travel, arrival, and diagnosis endpoint.
+- [x] Keep the deferred native payment surface explicitly provider-gated and prevent it from locally marking a service paid or complete.

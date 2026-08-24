@@ -70,3 +70,4 @@
 - [x] Extract and test the permitted technician progress sequence used by the protected travel, arrival, and diagnosis endpoint.
 - [x] Keep the deferred native payment surface explicitly provider-gated and prevent it from locally marking a service paid or complete.
 - [x] Add native removal controls for synchronised Passport document records through the protected owner-scoped procedure.
+- [x] Capture optional precise device coordinates during native home setup and persist them through the protected home contract so operations dispatch can use eligible service locations.

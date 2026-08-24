@@ -264,6 +264,7 @@ export default function App() {
   const [attachmentUri, setAttachmentUri] = useState<string | null>(null);
   const [attachmentMimeType, setAttachmentMimeType] = useState<"image/jpeg" | "image/png" | "image/webp">("image/jpeg");
   const [locationLabel, setLocationLabel] = useState("Kondapur, Hyderabad");
+  const [nativeCoordinates, setNativeCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus>("submitted");
   const [quoteApproved, setQuoteApproved] = useState(false);
   const [otp, setOtp] = useState("");
@@ -470,7 +471,8 @@ export default function App() {
       return;
     }
     try {
-      await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setNativeCoordinates({ latitude: location.coords.latitude, longitude: location.coords.longitude });
       setLocationLabel("Current location, Hyderabad");
     } catch {
       Alert.alert("Location unavailable", "You can still set your home address manually.");
@@ -521,6 +523,7 @@ export default function App() {
         locality: address.split(",")[0]?.trim() || address,
         city: "Hyderabad",
         homeType: nativeHomeType,
+        ...(nativeCoordinates ?? {}),
       });
       await refreshNativeHome();
       setOnboardingVisible(false);

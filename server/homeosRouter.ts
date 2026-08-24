@@ -136,11 +136,19 @@ export const homeosRouter = router({
         locality: z.string().trim().min(2).max(120),
         city: z.string().trim().min(2).max(120).default("Hyderabad"),
         postalCode: z.string().trim().max(20).optional(),
+        latitude: z.number().min(-90).max(90).optional(),
+        longitude: z.number().min(-180).max(180).optional(),
         homeType: z.enum(["apartment", "independent_house", "villa", "other"]),
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await databaseOrThrow();
-        await db.insert(homes).values({ ...input, ownerId: ctx.user.id, healthScore: 0 });
+        await db.insert(homes).values({
+          ...input,
+          latitude: input.latitude?.toFixed(7),
+          longitude: input.longitude?.toFixed(7),
+          ownerId: ctx.user.id,
+          healthScore: 0,
+        });
         const created = await db.select().from(homes).where(and(eq(homes.ownerId, ctx.user.id), eq(homes.label, input.label))).orderBy(desc(homes.id)).limit(1);
         return created[0];
       }),

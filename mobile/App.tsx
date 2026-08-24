@@ -795,6 +795,10 @@ export default function App() {
     const assignmentReached = Boolean(syncedRequestDetail?.technician) || ["assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid"].includes(trackingStatus);
     const diagnosisReached = ["diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid"].includes(trackingStatus);
     const completionReached = ["completion_pending", "completed", "paid"].includes(trackingStatus);
+    const activeWarranties = (syncedPassportHistory?.records ?? [])
+      .flatMap((record) => record.warranty && record.warranty.status === "active" && new Date(record.warranty.endsAt).getTime() > Date.now() ? [record.warranty] : [])
+      .sort((left, right) => new Date(left.endsAt).getTime() - new Date(right.endsAt).getTime());
+    const nextWarranty = activeWarranties[0] ?? null;
     if (screen === "home") {
       return (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -853,9 +857,9 @@ export default function App() {
 
           <SectionTitle title="Your home" />
           <View style={styles.panel}>
-            <Row icon="calendar-outline" title={`Saved appliances${syncedAppliances.length ? ` · ${syncedAppliances.length}` : ""}`} detail={syncedAppliances.length ? syncedAppliances.slice(0, 2).map((appliance) => [appliance.brand, appliance.model, appliance.category].filter(Boolean).join(" ")).join(" · ") : nativeSyncStatus === "signin_required" ? "Sign in to view your protected appliance records." : "Add appliances during your saved-home setup to track service history."} onPress={() => startFix("AC & appliances")} />
+            <Row icon="calendar-outline" title={`Saved appliances${syncedAppliances.length ? ` · ${syncedAppliances.length}` : ""}`} detail={syncedAppliances.length ? `${syncedAppliances.slice(0, 2).map((appliance) => [appliance.brand, appliance.model, appliance.category].filter(Boolean).join(" ")).join(" · ")}. Service recommendations appear only after protected service records exist.` : nativeSyncStatus === "signin_required" ? "Sign in to view your protected appliance records." : "No saved appliance records yet. Add appliances to build service history."} onPress={() => startFix("AC & appliances")} />
             <View style={styles.panelLine} />
-            <Row icon="shield-checkmark-outline" title="Active warranties" detail={syncedRequestDetail?.warranty ? `Active until ${new Date(syncedRequestDetail.warranty.endsAt).toLocaleDateString("en-IN")}` : "No active warranty record for your latest synchronised service."} onPress={() => setScreen("passport")} />
+            <Row icon="shield-checkmark-outline" title={`Active warranties${activeWarranties.length ? ` · ${activeWarranties.length}` : ""}`} detail={nextWarranty ? `Next expiry ${new Date(nextWarranty.endsAt).toLocaleDateString("en-IN")}. Synced from your protected Passport records.` : nativeSyncStatus === "signin_required" ? "Sign in to view warranty records." : "No active warranty records are currently stored for this home."} onPress={() => setScreen("passport")} />
           </View>
           <View style={styles.safetyNote}><AppIcon name="information-circle-outline" size={18} color={C.moss} /><Text style={styles.safetyText}>For sparks, gas smells, or a major leak, use Emergency help and follow the safety guidance first.</Text></View>
         </ScrollView>

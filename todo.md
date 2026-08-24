@@ -74,3 +74,4 @@
 - [x] Let an authenticated native customer update the coordinates of an existing saved home through a protected owner-scoped procedure.
 - [x] Make existing-home native coordinate refresh transactional so local labels update only after protected persistence succeeds and backend failures have distinct feedback.
 - [x] Persist the native customer-versus-technician mode selection through the protected account-intent contract instead of using only local role state.
+- [x] Render native customer tracking milestones from the selected protected request status instead of a static service timeline.

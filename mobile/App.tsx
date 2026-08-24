@@ -699,6 +699,10 @@ export default function App() {
   };
 
   const renderCustomerScreen = () => {
+    const trackingStatus = syncedRequestDetail?.request.status ?? selectedRequest?.status ?? "submitted";
+    const assignmentReached = Boolean(syncedRequestDetail?.technician) || ["assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid"].includes(trackingStatus);
+    const diagnosisReached = ["diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid"].includes(trackingStatus);
+    const completionReached = ["completion_pending", "completed", "paid"].includes(trackingStatus);
     if (screen === "home") {
       return (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -830,7 +834,7 @@ export default function App() {
           <View style={styles.trackingHeader}><Pill label={(selectedRequest?.status ?? "AWAITING DISPATCH").replaceAll("_", " ").toUpperCase()} tone="success" /><Text style={styles.trackingTime}>{selectedRequest ? selectedRequest.publicId : "No synchronised request"}</Text><Text style={styles.trackingAddress}>{syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel}</Text></View>
           <View style={styles.mapFrame}><View style={styles.mapGrid} /><View style={[styles.mapRoad, styles.roadOne]} /><View style={[styles.mapRoad, styles.roadTwo]} /><View style={styles.homePin}><AppIcon name="home" size={18} color={C.white} /></View><View style={styles.mapLegend}><View style={styles.legendDot} /><Text style={styles.legendText}>A live route and ETA appear only after a real technician is assigned and shares location securely.</Text></View></View>
           <View style={styles.techSummary}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={21} color={C.white} /></View><View style={styles.techSummaryCopy}><Text style={styles.matchPerson}>{syncedRequestDetail?.technician?.displayName ?? "Technician pending"}</Text><Text style={styles.matchSpecialty}>{syncedRequestDetail?.technician ? "Verified assigned professional. Live route and ETA appear only after secure location sharing is enabled." : "HomeOS will show the verified accepted professional here after an offer is accepted."}</Text></View></View>
-          <View style={styles.timeline}><Timeline active={Boolean(selectedRequest)} label="Request created" detail="Your protected request has been saved." /><Timeline label="Technician assignment" detail="Verified dispatch will update this screen after an offer is accepted." /><Timeline label="Diagnosis & quote" detail="No work begins before you approve the quote." /><Timeline label="Completion" detail="A one-time OTP is required to close the job." /></View>
+          <View style={styles.timeline}><Timeline active={Boolean(selectedRequest)} label="Request created" detail={selectedRequest ? "Your protected request has been saved." : "No protected request is currently selected."} /><Timeline active={assignmentReached} label="Technician assignment" detail={assignmentReached ? "A verified technician has been assigned to this request." : "Verified dispatch will update this screen after an offer is accepted."} /><Timeline active={diagnosisReached} label="Diagnosis & quote" detail={diagnosisReached ? "The job has reached diagnosis or quote review." : "No work begins before you approve the quote."} /><Timeline active={completionReached} label="Completion" detail={completionReached ? "Completion is awaiting or has recorded the required protected workflow step." : "A one-time OTP is required to close the job."} /></View>
         </ScrollView>
       );
     }

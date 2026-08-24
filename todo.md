@@ -63,3 +63,4 @@
 - [x] Let the native customer select a synchronised service request and load that request’s protected detail instead of always using the first record.
 - [x] Synchronise the native Passport service-history section from the protected home-scoped Passport contract, including completed requests, invoices, and warranties.
 - [x] Show both persisted invoice identification and warranty status/date for the same completed request in native Passport history rows.
+- [x] Synchronise protected HomeOS notifications in the native customer account and present persisted read/unread status without sample alerts.

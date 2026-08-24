@@ -105,6 +105,15 @@ type NativePassportHistory = {
   }>;
 };
 
+type SyncedNotification = {
+  id: number;
+  event: string;
+  title: string;
+  body: string;
+  readAt: Date | string | null;
+  createdAt: Date | string;
+};
+
 type NativeRequestDetail = {
   request: SyncedServiceRequest;
   technician: { displayName: string } | null;
@@ -267,6 +276,7 @@ export default function App() {
   const [syncedDocuments, setSyncedDocuments] = useState<SyncedPassportDocument[]>([]);
   const [syncedAppliances, setSyncedAppliances] = useState<SyncedAppliance[]>([]);
   const [syncedPassportHistory, setSyncedPassportHistory] = useState<NativePassportHistory | null>(null);
+  const [syncedNotifications, setSyncedNotifications] = useState<SyncedNotification[]>([]);
   const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
   const [nativeAssessment, setNativeAssessment] = useState<NativeAssessment | null>(null);
   const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
@@ -299,12 +309,14 @@ export default function App() {
     }
     setNativeSyncStatus("loading");
     try {
-      const [homes, requests] = await Promise.all([
+      const [homes, requests, notificationRecords] = await Promise.all([
         (homeosApi as any).homeos.homes.list.query() as Promise<SyncedHome[]>,
         (homeosApi as any).homeos.requests.list.query() as Promise<SyncedServiceRequest[]>,
+        (homeosApi as any).homeos.notifications.list.query() as Promise<SyncedNotification[]>,
       ]);
       setSyncedHome(homes[0] ?? null);
       setSyncedRequests(requests);
+      setSyncedNotifications(notificationRecords);
       const [documents, applianceRecords, passportHistory] = homes[0]
         ? await Promise.all([
           (homeosApi as any).homeos.passport.listDocuments.query({ homeId: homes[0].id }) as Promise<SyncedPassportDocument[]>,
@@ -329,6 +341,7 @@ export default function App() {
       setSyncedDocuments([]);
       setSyncedAppliances([]);
       setSyncedPassportHistory(null);
+      setSyncedNotifications([]);
       setSyncedRequestDetail(null);
       setNativeSyncStatus("signin_required");
     }
@@ -423,6 +436,15 @@ export default function App() {
     }
   };
 
+  const markNativeNotificationRead = async (notificationId: number) => {
+    try {
+      await (homeosApi as any).homeos.notifications.markRead.mutate({ notificationId });
+      setSyncedNotifications((records) => records.map((record) => record.id === notificationId ? { ...record, readAt: new Date() } : record));
+    } catch {
+      Alert.alert("Update unavailable", "HomeOS could not mark this protected update as read right now. Please try again.");
+    }
+  };
+
   const useLocation = async () => {
     const permission = await Location.requestForegroundPermissionsAsync();
     if (!permission.granted) {
@@ -458,6 +480,7 @@ export default function App() {
     setSyncedDocuments([]);
     setSyncedAppliances([]);
     setSyncedPassportHistory(null);
+    setSyncedNotifications([]);
     setSyncedRequestDetail(null);
     setNativeSyncStatus("signin_required");
   };
@@ -858,6 +881,8 @@ export default function App() {
         <SectionTitle title="Your home" />
         <View style={styles.panel}><Row icon="home-outline" title="Home setup" detail={syncedHome ? `${syncedHome.label} · ${syncedHome.locality}, ${syncedHome.city}` : "Address, home type, and appliances"} onPress={() => setOnboardingVisible(true)} /><View style={styles.panelLine} /><Row icon="location-outline" title="Service location" detail={syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel} onPress={useLocation} /><View style={styles.panelLine} /><Row icon="sync-outline" title="Account synchronisation" detail={nativeSyncStatus === "ready" ? "Signed in and loading HomeOS records" : nativeSyncStatus === "loading" ? "Checking your secure session…" : nativeSyncStatus === "signin_required" ? "Sign in is required to load your HomeOS records" : "HomeOS API endpoint is unavailable"} onPress={() => void refreshNativeHome()} /></View>
         {nativeSyncStatus === "signin_required" ? <PrimaryButton disabled={nativeLoginLoading} label={nativeLoginLoading ? "Opening secure sign-in…" : "Sign in to HomeOS"} icon="lock-closed-outline" onPress={signInToNativeHomeos} /> : nativeSyncStatus === "ready" ? <Press onPress={() => void signOutOfNativeHomeos()} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Sign out of this device</Text></Press> : null}
+        <SectionTitle title={`Updates${syncedNotifications.filter((notification) => !notification.readAt).length ? ` · ${syncedNotifications.filter((notification) => !notification.readAt).length} new` : ""}`} />
+        <View style={styles.panel}>{syncedNotifications.length ? syncedNotifications.slice(0, 5).map((notification, index) => <View key={notification.id}><Row icon={notification.readAt ? "notifications-outline" : "notifications"} title={notification.title} detail={`${notification.readAt ? "Read" : "New"} · ${notification.body}`} onPress={() => { if (!notification.readAt) void markNativeNotificationRead(notification.id); }} />{index < Math.min(syncedNotifications.length, 5) - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="notifications-outline" title="No synchronised updates" detail={nativeSyncStatus === "signin_required" ? "Sign in to view protected HomeOS updates." : "Service, payment, and warranty updates will appear here when they are saved."} />}</View>
         <SectionTitle title="App mode" />
         <Press onPress={() => setRole("technician")} style={styles.modeSwitch}><View style={styles.modeSwitchIcon}><AppIcon name="construct-outline" size={23} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>Open technician workspace</Text><Text style={styles.rowDetail}>Review and manage service opportunities.</Text></View><AppIcon name="arrow-forward" size={18} /></Press>
         <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Notification, maps, payments, and AI diagnosis connect to secure backend services when configured for your pilot.</Text></View>

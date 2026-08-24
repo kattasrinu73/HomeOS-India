@@ -86,3 +86,4 @@
 - [x] Record the successful refreshed internal Android APK that includes technician skill declaration and operations skill review.
 - [x] Show the native customer a protected, aggregate dispatch-handoff state that distinguishes an awaiting operator-controlled round from active verified offers without exposing technician data or fabricating an ETA.
 - [x] Render the same protected aggregate dispatch-handoff state in the web customer tracking view instead of a generic pending-technician placeholder.
+- [x] Add focused router-level caller tests that verify quote approval, quote-gated work start, and OTP-gated completion mutation behavior against a mocked database adapter.

@@ -43,6 +43,13 @@
       "when": 1787560257799,
       "tag": "0005_hesitant_miss_america",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787566252407,
+      "tag": "0006_chunky_senator_kelly",
+      "breakpoints": true
     }
   ]
 }

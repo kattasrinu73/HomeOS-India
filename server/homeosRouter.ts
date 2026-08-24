@@ -11,6 +11,7 @@ import {
   invoices,
   jobProofs,
   notificationRecords,
+  operationsRequestAudits,
   passportDocuments,
   payments,
   quoteItems,
@@ -874,6 +875,21 @@ export const homeosRouter = router({
         await db.update(serviceRequests).set({ status: "assigned", assignedTechnicianId: technician.id }).where(eq(serviceRequests.id, request.id));
         await db.insert(notificationRecords).values({ userId: request.customerId, serviceRequestId: request.id, event: "technician_assigned", title: "Your technician is confirmed", body: "A HomeOS operator confirmed your verified technician assignment. The technician can now prepare to travel." });
         return { success: true, status: "assigned" as const, serviceRequestId: request.id, technicianId: technician.id };
+      }),
+    cancelUnstartedRequest: adminProcedure
+      .input(z.object({ serviceRequestId: z.number().int().positive(), reason: z.string().trim().min(10).max(400) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, input.serviceRequestId)).limit(1);
+        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Service request not found." });
+        if (!["submitted", "matched", "assigned"].includes(request.status)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only an unstarted request can be cancelled by operations." });
+        }
+        await db.update(dispatchOffers).set({ status: "expired" }).where(and(eq(dispatchOffers.serviceRequestId, request.id), inArray(dispatchOffers.status, ["offered", "accepted"])));
+        await db.update(serviceRequests).set({ status: "cancelled" }).where(eq(serviceRequests.id, request.id));
+        await db.insert(operationsRequestAudits).values({ serviceRequestId: request.id, initiatedByUserId: ctx.user.id, action: "cancelled", reason: input.reason });
+        await db.insert(notificationRecords).values({ userId: request.customerId, serviceRequestId: request.id, event: "request_cancelled", title: "Your service request was cancelled", body: `HomeOS operations cancelled this unstarted request: ${input.reason}` });
+        return { success: true, status: "cancelled" as const, serviceRequestId: request.id };
       }),
     quoteReview: adminProcedure.query(async () => {
       const db = await databaseOrThrow();

@@ -14,7 +14,7 @@
 - [x] Implement itemised payment records for visit fee, parts, labour, taxes, platform fee, payment method, and wallet credits.
 - [ ] Bind generated and persisted digital invoices containing job ID, technician identity, parts, labour, taxes, payment information, and an explicit 30-day service warranty to the mobile client.
 - [ ] Populate the Home Service Passport from completed work records, proof, invoices, appliance history, and active 30-day warranties.
-- [ ] Add a distinct protected operations job-management view with persisted job actions and safeguards beyond monitoring and assignment confirmation.
+- [x] Add a distinct protected operations job-management view with persisted job actions and safeguards beyond monitoring and assignment confirmation.
 - [x] Implement in-app notification records and status updates for customer and technician job milestones, payment, warranty, and maintenance reminders.
 - [x] Build a live-tracking experience with a route/ETA interface that can later connect to real location providers.
 - [x] Use secure storage patterns for uploaded issue photos and job-proof attachments.
@@ -107,3 +107,4 @@
 - [x] Add a protected operations analytics contract and console view with persisted job-status, quote-funnel, completion, payment, and active-warranty counts, with focused record-derived tests.
 - [x] Require explicit protected operations assignment after a verified technician accepts a manual dispatch offer, with truthful pending-assignment states and focused transition coverage.
 - [x] Add a protected operations pricing-review queue that exposes persisted sent quotes, their itemised totals, request context, and technician identity without bypassing customer quote approval.
+- [x] Add an administrator-only unstarted-job cancellation action with a required reason, persisted audit evidence, offer closure, and customer notification.

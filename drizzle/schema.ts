@@ -128,6 +128,15 @@ export const dispatchRoundAudits = mysqlTable("dispatchRoundAudits", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [index("dispatch_round_audit_request_idx").on(table.serviceRequestId), index("dispatch_round_audit_created_idx").on(table.createdAt)]);
 
+export const operationsRequestAudits = mysqlTable("operationsRequestAudits", {
+  id: int("id").autoincrement().primaryKey(),
+  serviceRequestId: int("serviceRequestId").notNull(),
+  initiatedByUserId: int("initiatedByUserId").notNull(),
+  action: mysqlEnum("action", ["cancelled"]).notNull(),
+  reason: varchar("reason", { length: 400 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [index("operations_request_audit_request_idx").on(table.serviceRequestId), index("operations_request_audit_created_idx").on(table.createdAt)]);
+
 export const quotes = mysqlTable("quotes", {
   id: int("id").autoincrement().primaryKey(),
   serviceRequestId: int("serviceRequestId").notNull(),

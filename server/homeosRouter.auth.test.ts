@@ -336,6 +336,36 @@ describe("HomeOS protected workflow transitions", () => {
     expect(dbTestState.selections).toHaveLength(0);
   });
 
+  it("cancels only an unstarted request while recording the operator reason, expiring offers, and notifying the customer", async () => {
+    dbTestState.selections.push(
+      [{ id: 19, customerId: 202, status: "assigned" }],
+    );
+
+    const result = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).operations.cancelUnstartedRequest({
+      serviceRequestId: 19,
+      reason: "Customer requested a later service date.",
+    });
+
+    expect(result).toEqual({ success: true, status: "cancelled", serviceRequestId: 19 });
+    expect(dbTestState.updates.map(({ values }) => values)).toEqual([
+      { status: "expired" },
+      { status: "cancelled" },
+    ]);
+    expect(dbTestState.inserts.map(({ values }) => values)).toEqual([
+      { serviceRequestId: 19, initiatedByUserId: 101, action: "cancelled", reason: "Customer requested a later service date." },
+      expect.objectContaining({ userId: 202, serviceRequestId: 19, event: "request_cancelled" }),
+    ]);
+  });
+
+  it("forbids a regular account from cancelling a protected service request", async () => {
+    await expect(homeosRouter.createCaller(createAuthenticatedContext()).operations.cancelUnstartedRequest({
+      serviceRequestId: 19,
+      reason: "Customer requested a later service date.",
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(dbTestState.selections).toHaveLength(0);
+    expect(dbTestState.updates).toHaveLength(0);
+  });
+
   it("derives operations analytics from persisted request, latest quote, confirmed payment, and active-warranty records", async () => {
     dbTestState.selections.push(
       [

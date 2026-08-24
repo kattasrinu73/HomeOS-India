@@ -852,6 +852,64 @@ export const homeosRouter = router({
         };
       });
     }),
+    jobBoard: adminProcedure.query(async () => {
+      const db = await databaseOrThrow();
+      const jobs = await db.select().from(serviceRequests).where(inArray(serviceRequests.status, ["assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending"])).orderBy(desc(serviceRequests.updatedAt));
+      if (!jobs.length) return [];
+      const technicianIds = Array.from(new Set(jobs.map((job) => job.assignedTechnicianId).filter((technicianId): technicianId is number => Boolean(technicianId))));
+      const [assignedTechnicians, jobQuotes] = await Promise.all([
+        technicianIds.length ? db.select({ id: technicians.id, displayName: technicians.displayName, verificationStatus: technicians.verificationStatus }).from(technicians).where(inArray(technicians.id, technicianIds)) : [],
+        db.select({ id: quotes.id, serviceRequestId: quotes.serviceRequestId, status: quotes.status, updatedAt: quotes.updatedAt }).from(quotes).where(inArray(quotes.serviceRequestId, jobs.map((job) => job.id))),
+      ]);
+      const technicianById = new Map(assignedTechnicians.map((technician) => [technician.id, technician]));
+      const latestQuoteByRequest = new Map<number, typeof jobQuotes[number]>();
+      for (const quote of jobQuotes) {
+        const current = latestQuoteByRequest.get(quote.serviceRequestId);
+        if (!current || quote.id > current.id) latestQuoteByRequest.set(quote.serviceRequestId, quote);
+      }
+      return jobs.map((job) => ({
+        id: job.id,
+        publicId: job.publicId,
+        category: job.category,
+        urgency: job.urgency,
+        status: job.status,
+        updatedAt: job.updatedAt,
+        assignedTechnician: job.assignedTechnicianId ? technicianById.get(job.assignedTechnicianId) ?? null : null,
+        latestQuoteStatus: latestQuoteByRequest.get(job.id)?.status ?? null,
+      }));
+    }),
+    analytics: adminProcedure.query(async () => {
+      const db = await databaseOrThrow();
+      const [requests, quoteRows, paymentRows, warrantyRows] = await Promise.all([
+        db.select({ id: serviceRequests.id, status: serviceRequests.status }).from(serviceRequests),
+        db.select({ id: quotes.id, serviceRequestId: quotes.serviceRequestId, status: quotes.status }).from(quotes),
+        db.select({ status: payments.status, total: payments.total }).from(payments),
+        db.select({ status: warranties.status, endsAt: warranties.endsAt }).from(warranties),
+      ]);
+      const statusOrder = ["submitted", "matched", "assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid", "cancelled"] as const;
+      const statusCounts = statusOrder.map((status) => ({ status, count: requests.filter((request) => request.status === status).length }));
+      const latestQuoteByRequest = new Map<number, typeof quoteRows[number]>();
+      for (const quote of quoteRows) {
+        const current = latestQuoteByRequest.get(quote.serviceRequestId);
+        if (!current || quote.id > current.id) latestQuoteByRequest.set(quote.serviceRequestId, quote);
+      }
+      const latestQuotes = Array.from(latestQuoteByRequest.values());
+      const confirmedPayments = paymentRows.filter((payment) => payment.status === "confirmed");
+      const now = new Date();
+      return {
+        statusCounts,
+        quoteFunnel: {
+          total: latestQuotes.length,
+          sent: latestQuotes.filter((quote) => quote.status === "sent").length,
+          approved: latestQuotes.filter((quote) => quote.status === "approved").length,
+          rejected: latestQuotes.filter((quote) => quote.status === "rejected").length,
+        },
+        completedJobs: requests.filter((request) => request.status === "completed" || request.status === "paid").length,
+        confirmedPayments: confirmedPayments.length,
+        confirmedPaymentTotal: confirmedPayments.reduce((total, payment) => total + payment.total, 0),
+        activeWarranties: warrantyRows.filter((warranty) => warranty.status === "active" && warranty.endsAt.getTime() > now.getTime()).length,
+      };
+    }),
     technicians: adminProcedure.query(async () => {
       const db = await databaseOrThrow();
       return db.select({ id: technicians.id, displayName: technicians.displayName, verificationStatus: technicians.verificationStatus, availability: technicians.availability, serviceRadiusKm: technicians.serviceRadiusKm, locationUpdatedAt: technicians.locationUpdatedAt, createdAt: technicians.createdAt }).from(technicians).orderBy(desc(technicians.createdAt));

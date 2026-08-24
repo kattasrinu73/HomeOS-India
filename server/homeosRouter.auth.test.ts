@@ -50,10 +50,12 @@ function createMockDb() {
       orderBy: vi.fn(() => query),
       then: (resolve: (rows: unknown[]) => unknown, reject?: (error: unknown) => unknown) => Promise.resolve(selectedRows).then(resolve, reject),
     };
+    const fromQuery = {
+      where: vi.fn(() => query),
+      then: query.then,
+    };
     return {
-      from: vi.fn(() => ({
-        where: vi.fn(() => query),
-      })),
+      from: vi.fn(() => fromQuery),
     };
   });
   const update = vi.fn((table: unknown) => ({
@@ -238,6 +240,57 @@ describe("HomeOS protected workflow transitions", () => {
       id: 19,
       latestDispatchRound: expect.objectContaining({ round: 2, searchRadiusKm: 10, eligibleOfferCount: 2, outcome: "offers_created" }),
     })]);
+  });
+
+  it("returns an administrator-only job board from persisted active-job, technician, and quote records", async () => {
+    dbTestState.selections.push(
+      [{ id: 19, publicId: "HOS-JOB-19", category: "plumbing", urgency: "high", status: "quote_pending", updatedAt: new Date("2026-08-24T09:00:00.000Z"), assignedTechnicianId: 31 }],
+      [{ id: 31, displayName: "Verified technician", verificationStatus: "verified" }],
+      [{ id: 8, serviceRequestId: 19, status: "sent", updatedAt: new Date("2026-08-24T08:59:00.000Z") }],
+    );
+
+    const jobs = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).operations.jobBoard();
+
+    expect(jobs).toEqual([expect.objectContaining({
+      publicId: "HOS-JOB-19",
+      status: "quote_pending",
+      assignedTechnician: expect.objectContaining({ displayName: "Verified technician", verificationStatus: "verified" }),
+      latestQuoteStatus: "sent",
+    })]);
+  });
+
+  it("derives operations analytics from persisted request, latest quote, confirmed payment, and active-warranty records", async () => {
+    dbTestState.selections.push(
+      [
+        { id: 1, status: "submitted" },
+        { id: 2, status: "completed" },
+        { id: 3, status: "paid" },
+      ],
+      [
+        { id: 1, serviceRequestId: 1, status: "sent" },
+        { id: 2, serviceRequestId: 1, status: "approved" },
+        { id: 3, serviceRequestId: 2, status: "rejected" },
+      ],
+      [
+        { status: "confirmed", total: 2400 },
+        { status: "pending", total: 1800 },
+      ],
+      [
+        { status: "active", endsAt: new Date("2099-01-01T00:00:00.000Z") },
+        { status: "active", endsAt: new Date("2000-01-01T00:00:00.000Z") },
+        { status: "claimed", endsAt: new Date("2099-01-01T00:00:00.000Z") },
+      ],
+    );
+
+    const analytics = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).operations.analytics();
+
+    expect(analytics.statusCounts).toEqual(expect.arrayContaining([
+      { status: "submitted", count: 1 },
+      { status: "completed", count: 1 },
+      { status: "paid", count: 1 },
+    ]));
+    expect(analytics.quoteFunnel).toEqual({ total: 2, sent: 0, approved: 1, rejected: 1 });
+    expect(analytics).toMatchObject({ completedJobs: 2, confirmedPayments: 1, confirmedPaymentTotal: 2400, activeWarranties: 1 });
   });
 
   it("refreshes a persisted Home Health Score on protected home reads when an active warranty has expired", async () => {

@@ -103,3 +103,5 @@
 - [x] Replace static native home warranty and maintenance copy with protected record-derived summary states and clear no-record messaging.
 - [x] Generate and deliver an Allure-compatible testing report from the latest automated HomeOS validation, with device and provider verification boundaries stated clearly.
 - [x] Record the successful Android APK containing record-derived native Home summaries and revise the Allure-compatible report from build-pending to build-passed.
+- [x] Add protected record-derived operations job-state monitoring and service analytics without mock metrics or automatic dispatch.
+- [x] Add a protected operations analytics contract and console view with persisted job-status, quote-funnel, completion, payment, and active-warranty counts, with focused record-derived tests.

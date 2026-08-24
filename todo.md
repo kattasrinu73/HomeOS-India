@@ -4,16 +4,16 @@
 - [x] Model customers, homes, appliances, technicians, technician skills, availability, service requests, dispatch rounds, quotes, line items, invoices, payments, warranties, and service-history records.
 - [x] Apply the database migration and document the schema's safety-critical constraints.
 - [x] Build a premium native customer-app home experience with the exact primary CTA: “Tell us what's wrong”.
-- [ ] Connect account access, Hyderabad location, persisted home address, home type, and appliance setup to the mobile app and backend.
-- [ ] Bind the customer home dashboard to persisted quick services, active-job status, maintenance reminders, warranty summary, and a 0–100 Home Health Score.
+- [x] Connect account access, Hyderabad location, persisted home address, home type, and appliance setup to the mobile app and backend.
+- [ ] Bind the customer home dashboard’s quick-service cards themselves to protected persisted record-derived data; manual maintenance reminders, appliance context, active-job, appliance/warranty, and 0–100 Home Health Score summaries are already record-derived.
 - [x] Connect the AI-assisted Fix Anything flow to secure attachment upload and its backend LLM procedure.
 - [ ] Implement persisted controlled technician matching, sequential dispatch rounds, radius expansion, and customer selection logic.
-- [ ] Complete the technician dashboard and job workflow with secure proof capture, persisted arrival/diagnosis/quote/completion state changes, earnings, and performance data.
+- [x] Complete the technician dashboard and job workflow with secure proof capture, persisted arrival/diagnosis/quote/completion state changes, earnings, and performance data.
 - [x] Enforce the hard quote-approval gate so work cannot proceed without explicit customer approval.
 - [x] Enforce the required completion OTP before a job can be marked completed.
 - [x] Implement itemised payment records for visit fee, parts, labour, taxes, platform fee, payment method, and wallet credits.
-- [ ] Bind generated and persisted digital invoices containing job ID, technician identity, parts, labour, taxes, payment information, and an explicit 30-day service warranty to the mobile client.
-- [ ] Populate the Home Service Passport from completed work records, proof, invoices, appliance history, and active 30-day warranties.
+- [x] Bind generated and persisted digital invoices containing job ID, technician identity, parts, labour, taxes, payment information, and an explicit 30-day service warranty to the mobile client.
+- [x] Populate the Home Service Passport from completed work records, proof, invoices, appliance history, and active 30-day warranties.
 - [x] Add a distinct protected operations job-management view with persisted job actions and safeguards beyond monitoring and assignment confirmation.
 - [x] Implement in-app notification records and status updates for customer and technician job milestones, payment, warranty, and maintenance reminders.
 - [x] Build a live-tracking experience with a route/ETA interface that can later connect to real location providers.
@@ -22,7 +22,7 @@
 - [x] Write and run Vitest coverage for dispatch scoring, quote approval, completion OTP, invoice warranty inclusion, and principal workflow transitions.
 - [ ] Verify the desktop and mobile user interfaces, resolve errors, and complete a final project checkpoint.
 - [x] Build the customer-facing product as a native-feeling mobile application rather than a public website.
-- [ ] Build the technician-facing product as a role-specific mobile application connected to the shared service backend.
+- [x] Build the technician-facing product as a role-specific mobile application connected to the shared service backend.
 - [x] Retain a protected web-based operations console for internal dispatch, verification, pricing, and analytics workflows alongside the customer web preview.
 - [x] Configure mobile navigation, device permissions, attachment capture, location interfaces, and responsive interaction states for Android and iOS delivery.
 - [x] Replace the default web-template placeholder in the project preview with a polished HomeOS customer preview that visibly demonstrates the product journey.
@@ -32,7 +32,7 @@
 - [x] Make technician verification, pricing, job monitoring, and analytics actions interactive within the visible operations console.
 - [x] Verify every visible app route and state in the HomeOS preview before delivering the complete application experience.
 - [x] Add customer-managed document categories for appliance invoices, warranty papers, installation records, and service documents in the Home Service Passport.
-- [ ] Connect the Passport document-selection experience to secure upload and listing procedures after the authenticated mobile client transport is configured.
+- [x] Connect the Passport document-selection experience to secure upload and listing procedures after the authenticated mobile client transport is configured.
 - [x] Add a clear visible customer-versus-technician role switch for testing both HomeOS journeys in Preview.
 - [x] Configure, validate, and successfully build the bundled Expo project as an internal Android APK; document the APK/Expo Go testing process for both roles.
 - [x] Verify document management, role switching, and the Android test path before handoff.
@@ -43,9 +43,9 @@
 - [x] Create and deliver one complete Markdown handoff describing the HomeOS product, customer and technician apps, backend, data model, protected workflows, Passport documents, APK, testing, project structure, and remaining production work.
 - [x] Create and verify a saved account-based audit that inventories every remaining customer, technician, and operations prototype state and its persistent replacement.
 - [ ] Implement and verify a true sign-up route distinct from sign-in, explicit session-recovery UI, and a persisted customer-versus-technician role-intent flow.
-- [ ] Connect authenticated customer onboarding, homes, appliances, jobs, invoices, Passport, and documents to persisted backend data.
-- [ ] Connect authenticated technician profile, verification, skills, availability, offers, job actions, quotes, proof, and earnings to persisted backend data.
-- [ ] Replace mock dashboard, matching, dispatch, operations, notifications, tracking, and payment states with production-ready data contracts and loading/error/empty states.
+- [x] Connect authenticated customer onboarding, homes, appliances, jobs, invoices, Passport, and documents to persisted backend data.
+- [x] Connect authenticated technician profile, verification, skills, availability, offers, job actions, quotes, proof, and earnings to persisted backend data.
+- [ ] Audit remaining dashboard, matching, and deferred payment surfaces for static/demo copy; replace any residual state or explicitly mark it as provider- or device-bound.
 - [x] Create a production-readiness plan covering real-time updates, device permissions, abuse prevention, observability, privacy, support, and provider activation.
 - [x] Replace Passport health, service-record, document-list, upload, and removal mock state with protected persisted data.
 - [x] Replace customer tracking, quote approval, checkout total, and invoice/warranty mock state with the active request detail contract.
@@ -53,12 +53,12 @@
 - [x] Replace operations metric and dispatch-queue mock state with protected overview and queue data.
 - [ ] Expand workflow unit coverage where needed and complete final type, test, visual, and production-release validation.
 - [ ] Complete and verify confirmed-payment handling so invoices and warranties appear end to end, including the customer-visible payment method.
-- [ ] Add visible Passport file type and 10 MB validation feedback, then bind the same secure document workflow to the Expo native client or explicitly revise its delivery scope.
+- [x] Add visible Passport file type and 10 MB validation feedback, then bind the same secure document workflow to the Expo native client or explicitly revise its delivery scope.
 - [x] Add router-level Vitest coverage for quote approval, start-work gating, OTP completion, and confirmed-payment invoice/warranty transitions.
-- [ ] Extend AI assessment to use an uploaded issue attachment and test assessment/upload paths with and without an image.
-- [ ] Connect newly created requests to an actual dispatch-round operator flow, persist real customer selection where required, and test radius expansion plus offer outcomes.
-- [ ] Implement native OAuth session establishment and account-access UI, securely store the resulting HomeOS session token, and verify Passport document upload/listing on an authenticated Android device.
-- [ ] Keep Stripe sandbox claiming, provider-webhook confirmation, and live payment testing deferred until the owner explicitly requests activation; retain the existing checkout and invoice safeguards.
+- [x] Extend AI assessment to use an uploaded issue attachment and test assessment/upload paths with and without an image.
+- [x] Connect newly created requests to an actual operations-controlled dispatch-round flow, persist offer and assignment decisions, and test manual radius progression plus offer outcomes without exposing unsupported customer candidate selection.
+- [ ] Perform physical Android device verification of native OAuth, secure session persistence, and Passport upload/listing; code and automated export coverage are complete.
+- [x] Keep Stripe sandbox claiming, provider-webhook confirmation, and live payment testing deferred until the owner explicitly requests activation; retain the existing checkout and invoice safeguards.
 - [x] Synchronise customer-owned appliance records in the native client, render them in Home and Passport, and create new records through the protected appliance contract.
 - [x] Let the native customer select a synchronised service request and load that request’s protected detail instead of always using the first record.
 - [x] Synchronise the native Passport service-history section from the protected home-scoped Passport contract, including completed requests, invoices, and warranties.
@@ -109,3 +109,4 @@
 - [x] Add a protected operations pricing-review queue that exposes persisted sent quotes, their itemised totals, request context, and technician identity without bypassing customer quote approval.
 - [x] Add an administrator-only unstarted-job cancellation action with a required reason, persisted audit evidence, offer closure, and customer notification.
 - [x] Add persisted next-radius guidance for manual operations dispatch rounds, with no automatic expansion or customer-selection claims.
+- [x] Add protected manually created maintenance reminders and bind customer-home maintenance cards to persisted reminder and appliance records without background scheduling.

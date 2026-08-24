@@ -367,6 +367,35 @@ describe("HomeOS protected workflow transitions", () => {
     expect(dbTestState.updates).toHaveLength(0);
   });
 
+  it("creates and completes a persisted maintenance reminder only for the owning customer home", async () => {
+    const dueAt = new Date("2026-09-01T00:00:00.000Z");
+    dbTestState.selections.push(
+      [{ id: 9 }],
+      [{ id: 41, homeId: 9, ownerId: 101, applianceId: null, title: "Service the air conditioner", dueAt, status: "open", completedAt: null, createdAt: dueAt }],
+      [{ id: 41, homeId: 9, ownerId: 101, status: "open" }],
+    );
+
+    const caller = homeosRouter.createCaller(createAuthenticatedContext(101));
+    const reminder = await caller.maintenance.create({ homeId: 9, title: "Service the air conditioner", dueAt });
+    const completion = await caller.maintenance.complete({ reminderId: 41 });
+
+    expect(reminder).toMatchObject({ id: 41, homeId: 9, ownerId: 101, status: "open" });
+    expect(completion).toEqual({ success: true, status: "done", reminderId: 41 });
+    expect(dbTestState.inserts[0]?.values).toEqual({ homeId: 9, title: "Service the air conditioner", dueAt, ownerId: 101, status: "open" });
+    expect(dbTestState.updates[0]?.values).toMatchObject({ status: "done", completedAt: expect.any(Date) });
+  });
+
+  it("rejects maintenance reminder creation for a home outside the customer account", async () => {
+    dbTestState.selections.push([]);
+
+    await expect(homeosRouter.createCaller(createAuthenticatedContext()).maintenance.create({
+      homeId: 9,
+      title: "Service the air conditioner",
+      dueAt: new Date("2026-09-01T00:00:00.000Z"),
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(dbTestState.inserts).toHaveLength(0);
+  });
+
   it("derives operations analytics from persisted request, latest quote, confirmed payment, and active-warranty records", async () => {
     dbTestState.selections.push(
       [

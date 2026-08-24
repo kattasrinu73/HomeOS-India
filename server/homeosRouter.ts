@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
@@ -9,6 +9,7 @@ import {
   dispatchRoundAudits,
   homes,
   invoices,
+  maintenanceReminders,
   jobProofs,
   notificationRecords,
   operationsRequestAudits,
@@ -227,6 +228,41 @@ export const homeosRouter = router({
         const [created] = await db.select().from(appliances).where(and(eq(appliances.homeId, input.homeId), eq(appliances.category, input.category))).orderBy(desc(appliances.id)).limit(1);
         if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the appliance." });
         return created;
+      }),
+  }),
+  maintenance: router({
+    list: protectedProcedure
+      .input(z.object({ homeId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
+        if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot view reminders for this home." });
+        return db.select().from(maintenanceReminders).where(and(eq(maintenanceReminders.homeId, input.homeId), eq(maintenanceReminders.ownerId, ctx.user.id))).orderBy(asc(maintenanceReminders.dueAt));
+      }),
+    create: protectedProcedure
+      .input(z.object({ homeId: z.number().int().positive(), applianceId: z.number().int().positive().optional(), title: z.string().trim().min(3).max(180), dueAt: z.date() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
+        if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot add reminders to this home." });
+        if (input.applianceId) {
+          const [appliance] = await db.select({ id: appliances.id }).from(appliances).where(and(eq(appliances.id, input.applianceId), eq(appliances.homeId, input.homeId))).limit(1);
+          if (!appliance) throw new TRPCError({ code: "FORBIDDEN", message: "Choose an appliance saved for this home." });
+        }
+        await db.insert(maintenanceReminders).values({ ...input, ownerId: ctx.user.id, status: "open" });
+        const [created] = await db.select().from(maintenanceReminders).where(and(eq(maintenanceReminders.homeId, input.homeId), eq(maintenanceReminders.ownerId, ctx.user.id), eq(maintenanceReminders.title, input.title), eq(maintenanceReminders.dueAt, input.dueAt))).orderBy(desc(maintenanceReminders.id)).limit(1);
+        if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the maintenance reminder." });
+        return created;
+      }),
+    complete: protectedProcedure
+      .input(z.object({ reminderId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [reminder] = await db.select().from(maintenanceReminders).where(and(eq(maintenanceReminders.id, input.reminderId), eq(maintenanceReminders.ownerId, ctx.user.id))).limit(1);
+        if (!reminder) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot update this maintenance reminder." });
+        if (reminder.status === "done") return { success: true, status: "done" as const, reminderId: reminder.id };
+        await db.update(maintenanceReminders).set({ status: "done", completedAt: new Date() }).where(eq(maintenanceReminders.id, reminder.id));
+        return { success: true, status: "done" as const, reminderId: reminder.id };
       }),
   }),
   account: router({

@@ -59,6 +59,18 @@ export const appliances = mysqlTable("appliances", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [index("appliances_home_idx").on(table.homeId)]);
 
+export const maintenanceReminders = mysqlTable("maintenanceReminders", {
+  id: int("id").autoincrement().primaryKey(),
+  homeId: int("homeId").notNull(),
+  ownerId: int("ownerId").notNull(),
+  applianceId: int("applianceId"),
+  title: varchar("title", { length: 180 }).notNull(),
+  dueAt: timestamp("dueAt").notNull(),
+  status: mysqlEnum("status", ["open", "done"]).notNull().default("open"),
+  completedAt: timestamp("completedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [index("maintenance_reminder_home_idx").on(table.homeId), index("maintenance_reminder_owner_status_idx").on(table.ownerId, table.status), index("maintenance_reminder_due_idx").on(table.dueAt)]);
+
 export const technicians = mysqlTable("technicians", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),

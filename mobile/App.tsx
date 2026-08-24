@@ -28,7 +28,8 @@ import {
   warrantyEndsOn,
   type JobStatus,
 } from "./src/workflow";
-import { homeosApi, homeosApiConfigured } from "./src/homeosApi";
+import { clearNativeSessionToken, homeosApi, homeosApiConfigured } from "./src/homeosApi";
+import { startNativeHomeosLogin } from "./src/nativeAuth";
 
 const C = {
   ink: "#14251F",
@@ -253,6 +254,7 @@ export default function App() {
   const [nativeHomeSaving, setNativeHomeSaving] = useState(false);
   const [nativeHomeAddress, setNativeHomeAddress] = useState("");
   const [nativeHomeType, setNativeHomeType] = useState<"apartment" | "independent_house" | "villa" | "other">("apartment");
+  const [nativeLoginLoading, setNativeLoginLoading] = useState(false);
   const [nativeSyncStatus, setNativeSyncStatus] = useState<"loading" | "ready" | "signin_required" | "unavailable">("loading");
 
   const warrantyEnd = useMemo(() => warrantyEndsOn(new Date()), []);
@@ -391,6 +393,29 @@ export default function App() {
     } catch {
       Alert.alert("Location unavailable", "You can still set your home address manually.");
     }
+  };
+
+  const signInToNativeHomeos = async () => {
+    setNativeLoginLoading(true);
+    try {
+      await startNativeHomeosLogin();
+      await refreshNativeHome();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "HomeOS could not complete secure sign-in.";
+      Alert.alert("Secure sign-in unavailable", message);
+    } finally {
+      setNativeLoginLoading(false);
+    }
+  };
+
+  const signOutOfNativeHomeos = async () => {
+    await clearNativeSessionToken();
+    setSyncedHome(null);
+    setSyncedRequests([]);
+    setSyncedDocuments([]);
+    setSyncedRequestDetail(null);
+    setNativeSyncStatus("signin_required");
   };
 
   const saveNativeHomeSetup = async () => {
@@ -732,7 +757,8 @@ export default function App() {
         <ScreenHeader title="Account" />
         <View style={styles.profileHeader}><View style={styles.profileAvatar}><Text style={styles.profileInitial}>S</Text></View><View><Text style={styles.profileName}>Your HomeOS account</Text><Text style={styles.profileDetail}>Homeowner · Hyderabad</Text></View></View>
         <SectionTitle title="Your home" />
-        <View style={styles.panel}><Row icon="home-outline" title="Home setup" detail={syncedHome ? `${syncedHome.label} · ${syncedHome.locality}, ${syncedHome.city}` : "Address, home type, and appliances"} onPress={() => setOnboardingVisible(true)} /><View style={styles.panelLine} /><Row icon="location-outline" title="Service location" detail={syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel} onPress={useLocation} /><View style={styles.panelLine} /><Row icon="sync-outline" title="Account synchronisation" detail={nativeSyncStatus === "ready" ? "Saved home loaded from HomeOS" : nativeSyncStatus === "loading" ? "Checking your secure session…" : nativeSyncStatus === "signin_required" ? "Sign in is required to load your HomeOS records" : "HomeOS API endpoint is unavailable"} onPress={() => void refreshNativeHome()} /></View>
+        <View style={styles.panel}><Row icon="home-outline" title="Home setup" detail={syncedHome ? `${syncedHome.label} · ${syncedHome.locality}, ${syncedHome.city}` : "Address, home type, and appliances"} onPress={() => setOnboardingVisible(true)} /><View style={styles.panelLine} /><Row icon="location-outline" title="Service location" detail={syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel} onPress={useLocation} /><View style={styles.panelLine} /><Row icon="sync-outline" title="Account synchronisation" detail={nativeSyncStatus === "ready" ? "Signed in and loading HomeOS records" : nativeSyncStatus === "loading" ? "Checking your secure session…" : nativeSyncStatus === "signin_required" ? "Sign in is required to load your HomeOS records" : "HomeOS API endpoint is unavailable"} onPress={() => void refreshNativeHome()} /></View>
+        {nativeSyncStatus === "signin_required" ? <PrimaryButton disabled={nativeLoginLoading} label={nativeLoginLoading ? "Opening secure sign-in…" : "Sign in to HomeOS"} icon="lock-closed-outline" onPress={signInToNativeHomeos} /> : nativeSyncStatus === "ready" ? <Press onPress={() => void signOutOfNativeHomeos()} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Sign out of this device</Text></Press> : null}
         <SectionTitle title="App mode" />
         <Press onPress={() => setRole("technician")} style={styles.modeSwitch}><View style={styles.modeSwitchIcon}><AppIcon name="construct-outline" size={23} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>Open technician workspace</Text><Text style={styles.rowDetail}>Review and manage service opportunities.</Text></View><AppIcon name="arrow-forward" size={18} /></Press>
         <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Notification, maps, payments, and AI diagnosis connect to secure backend services when configured for your pilot.</Text></View>

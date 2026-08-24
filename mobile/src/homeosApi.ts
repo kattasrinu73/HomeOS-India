@@ -39,3 +39,7 @@ export const homeosApi = createTRPCProxyClient<any>({
 export function homeosApiConfigured(): boolean {
   return Boolean(apiBaseUrl.startsWith("https://"));
 }
+
+export function homeosApiBaseUrl(): string {
+  return apiBaseUrl;
+}

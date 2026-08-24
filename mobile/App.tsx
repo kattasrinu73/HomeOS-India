@@ -1090,11 +1090,12 @@ function Timeline({ label, detail, active = false }: { label: string; detail: st
   return <View style={styles.timelineRow}><View style={[styles.timelineDot, active && styles.timelineDotActive]}>{active ? <AppIcon name="checkmark" size={11} color={C.white} /> : null}</View><View style={styles.timelineCopy}><Text style={[styles.timelineLabel, active && styles.timelineLabelActive]}>{label}</Text><Text style={styles.timelineDetail}>{detail}</Text></View></View>;
 }
 
-type NativeTechnicianOffer = { offer: { id: number; round: number; searchRadiusKm: number }; request: SyncedServiceRequest | null };
+type NativeTechnicianOffer = { offer: { id: number; round: number; searchRadiusKm: number; status: "offered" | "accepted" }; request: SyncedServiceRequest | null };
 type NativeTechnicianSummary = { completedJobCount: number; activeJobCount: number; confirmedPaymentCount: number; confirmedCustomerPaymentTotal: number };
 
 function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () => void }) {
   const [offers, setOffers] = useState<NativeTechnicianOffer[]>([]);
+  const [pendingOperatorAssignments, setPendingOperatorAssignments] = useState<NativeTechnicianOffer[]>([]);
   const [jobs, setJobs] = useState<SyncedServiceRequest[]>([]);
   const [summary, setSummary] = useState<NativeTechnicianSummary | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "signin_required">("loading");
@@ -1119,12 +1120,14 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
         (homeosApi as any).homeos.technician.jobs.query() as Promise<SyncedServiceRequest[]>,
         (homeosApi as any).homeos.technician.summary.query() as Promise<NativeTechnicianSummary>,
       ]);
-      setOffers(nextOffers);
+      setOffers(nextOffers.filter((entry) => entry.offer.status === "offered"));
+      setPendingOperatorAssignments(nextOffers.filter((entry) => entry.offer.status === "accepted"));
       setJobs(nextJobs);
       setSummary(nextSummary);
       setState("ready");
     } catch {
       setOffers([]);
+      setPendingOperatorAssignments([]);
       setJobs([]);
       setSummary(null);
       setState("signin_required");
@@ -1136,9 +1139,10 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
   const acceptOffer = async (offerId: number) => {
     setAcceptingOfferId(offerId);
     try {
-      await (homeosApi as any).homeos.technician.acceptOffer.mutate({ offerId });
+      const result = await (homeosApi as any).homeos.technician.acceptOffer.mutate({ offerId });
       await refresh();
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (result?.assignmentPending) Alert.alert("Offer accepted", "Your acceptance is recorded. A HomeOS operations administrator must confirm the final assignment before travel or job actions become available.");
     } catch {
       Alert.alert("Offer unavailable", "This protected offer may have already been accepted or expired. Refresh and try again.");
     } finally {
@@ -1275,6 +1279,7 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
         {state === "loading" ? <View style={styles.panel}><Row icon="sync-outline" title="Loading technician records" detail="Checking protected offers and assigned jobs." /></View> : state === "signin_required" ? <View style={styles.panel}><Row icon="lock-closed-outline" title="Technician sign-in required" detail="Sign in with a verified technician account before accessing protected jobs and dispatch offers." /></View> : <>
           <SectionTitle title="Your protected performance" />
           <View style={styles.panel}><Row icon="checkmark-done-outline" title={`${summary?.completedJobCount ?? 0} completed jobs`} detail={`${summary?.activeJobCount ?? 0} active assigned jobs`} /><View style={styles.panelLine} /><Row icon="wallet-outline" title={`${formatIndianRupees(summary?.confirmedCustomerPaymentTotal ?? 0)} confirmed customer payments`} detail={`${summary?.confirmedPaymentCount ?? 0} provider-confirmed payment records`} /></View>
+          {pendingOperatorAssignments.length ? <><SectionTitle title="Assignment confirmation pending" /><View style={styles.panel}>{pendingOperatorAssignments.map((entry, index) => <View key={entry.offer.id}><Row icon="time-outline" title={entry.request ? `${entry.request.category.replaceAll("_", " ")} accepted` : "Accepted dispatch offer"} detail="Your acceptance is recorded. A HomeOS operations administrator must confirm final assignment before you begin travel." />{index < pendingOperatorAssignments.length - 1 ? <View style={styles.panelLine} /> : null}</View>)}</View></> : null}
           <SectionTitle title="New dispatch offers" />
           <View style={styles.panel}>{offers.length ? offers.map((entry, index) => entry.request ? <View key={entry.offer.id}><Row icon="construct-outline" title={entry.request.category.replaceAll("_", " ")} detail={`${entry.request.publicId} · ${entry.request.urgency} priority · Round ${entry.offer.round} within ${entry.offer.searchRadiusKm} km`} />{index < offers.length - 1 ? <View style={styles.panelLine} /> : null}<View style={{ flexDirection: "row", gap: 10, padding: 15, paddingTop: 0 }}><Press onPress={() => void acceptOffer(entry.offer.id)} disabled={acceptingOfferId === entry.offer.id} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>{acceptingOfferId === entry.offer.id ? "Accepting…" : "Accept"}</Text></Press><Press onPress={() => void declineOffer(entry.offer.id)} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>Decline</Text></Press></View></View> : null) : <Row icon="briefcase-outline" title="No live offers" detail="Verified offers matching your availability and skills will appear here." />}</View>
           <SectionTitle title="Assigned work" />

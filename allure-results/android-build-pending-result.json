@@ -1,14 +1,14 @@
 {
-  "uuid": "homeos-android-build-pending-20260824",
-  "historyId": "homeos-android-build-pending",
-  "testCaseId": "homeos-android-build-pending",
+  "uuid": "homeos-android-build-manual-assignment-20260824",
+  "historyId": "homeos-android-build-internal-apk",
+  "testCaseId": "homeos-android-build-internal-apk",
   "name": "Updated internal Android APK build",
   "fullName": "HomeOS automated validation.Updated internal Android APK build",
   "status": "passed",
   "stage": "finished",
-  "description": "Expo build b5ddf7f1-7ad3-4069-998a-fe6ce15a7ed0 completed successfully and is available as an internal Android APK.",
-  "start": 1787563925346,
-  "stop": 1787563926346,
+  "description": "Expo build 73522b2e-39e1-471d-92fe-6a8263234788 completed successfully and is available as an internal Android APK with technician acceptance pending protected operations assignment confirmation.",
+  "start": 1787565400000,
+  "stop": 1787566000000,
   "labels": [
     { "name": "suite", "value": "Native validation" },
     { "name": "framework", "value": "Expo Application Services" }

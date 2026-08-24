@@ -67,6 +67,7 @@ export function buildCustomerDispatchHandoff(input: { requestStatus: ServiceJobS
   const latestRound = input.offers.length ? Math.max(...input.offers.map((offer) => offer.round)) : null;
   const latestRoundOffers = latestRound === null ? [] : input.offers.filter((offer) => offer.round === latestRound);
   const activeOfferCount = latestRoundOffers.filter((offer) => offer.status === "offered").length;
+  const acceptedOfferCount = latestRoundOffers.filter((offer) => offer.status === "accepted").length;
   const searchRadiusKm = latestRoundOffers[0]?.searchRadiusKm ?? null;
   const alreadyAssigned = ["assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending", "completed", "paid"].includes(input.requestStatus);
 
@@ -105,8 +106,10 @@ export function buildCustomerDispatchHandoff(input: { requestStatus: ServiceJobS
 
   return {
     state: "operator_review" as const,
-    label: "Operator dispatch review",
-    message: "The current dispatch round has no accepted technician. A HomeOS operator is reviewing the next safe dispatch step.",
+    label: acceptedOfferCount ? "Operator assignment confirmation" : "Operator dispatch review",
+    message: acceptedOfferCount
+      ? "A verified technician has accepted the protected offer. A HomeOS operator is confirming final assignment before the job can begin."
+      : "The current dispatch round has no accepted technician. A HomeOS operator is reviewing the next safe dispatch step.",
     round: latestRound,
     searchRadiusKm,
     activeOfferCount: 0,

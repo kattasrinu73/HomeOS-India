@@ -232,6 +232,8 @@ describe("HomeOS protected workflow transitions", () => {
         { id: 4, serviceRequestId: 19, round: 1, searchRadiusKm: 5, eligibleOfferCount: 0, outcome: "exhausted", createdAt: new Date("2026-08-24T08:00:00.000Z") },
         { id: 5, serviceRequestId: 19, round: 2, searchRadiusKm: 10, eligibleOfferCount: 2, outcome: "offers_created", createdAt: new Date("2026-08-24T08:10:00.000Z") },
       ],
+      [{ id: 44, serviceRequestId: 19, technicianId: 31, status: "accepted" }],
+      [{ id: 31, displayName: "Verified technician", verificationStatus: "verified" }],
     );
 
     const queue = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).operations.dispatchQueue();
@@ -239,6 +241,7 @@ describe("HomeOS protected workflow transitions", () => {
     expect(queue).toEqual([expect.objectContaining({
       id: 19,
       latestDispatchRound: expect.objectContaining({ round: 2, searchRadiusKm: 10, eligibleOfferCount: 2, outcome: "offers_created" }),
+      acceptedTechnicians: [{ offerId: 44, technician: { id: 31, displayName: "Verified technician", verificationStatus: "verified" } }],
     })]);
   });
 
@@ -257,6 +260,48 @@ describe("HomeOS protected workflow transitions", () => {
       assignedTechnician: expect.objectContaining({ displayName: "Verified technician", verificationStatus: "verified" }),
       latestQuoteStatus: "sent",
     })]);
+  });
+
+  it("keeps a verified technician acceptance pending until protected operations explicitly assigns the offer", async () => {
+    dbTestState.selections.push(
+      [{ id: 31, userId: 101, verificationStatus: "verified", availability: "available" }],
+      [{ id: 44, serviceRequestId: 19, technicianId: 31, status: "offered" }],
+      [{ id: 19, status: "matched", assignedTechnicianId: null, customerId: 202 }],
+    );
+
+    const result = await homeosRouter.createCaller(createAuthenticatedContext()).technician.acceptOffer({ offerId: 44 });
+
+    expect(result).toEqual({ success: true, status: "matched", assignmentPending: true });
+    expect(dbTestState.updates.map(({ values }) => values)).toEqual([{ status: "accepted" }]);
+    expect(dbTestState.inserts).toHaveLength(0);
+  });
+
+  it("allows only operations to confirm a persisted accepted offer as the final technician assignment", async () => {
+    dbTestState.selections.push(
+      [{ id: 44, serviceRequestId: 19, technicianId: 31, status: "accepted" }],
+      [{ id: 19, status: "matched", assignedTechnicianId: null, customerId: 202 }],
+      [{ id: 31, displayName: "Verified technician", verificationStatus: "verified" }],
+    );
+
+    const result = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).operations.assignAcceptedOffer({ offerId: 44 });
+
+    expect(result).toEqual({ success: true, status: "assigned", serviceRequestId: 19, technicianId: 31 });
+    expect(dbTestState.updates.map(({ values }) => values)).toEqual([
+      { status: "expired" },
+      { status: "assigned", assignedTechnicianId: 31 },
+    ]);
+    expect(dbTestState.inserts.map(({ values }) => values)).toEqual([expect.objectContaining({
+      userId: 202,
+      serviceRequestId: 19,
+      event: "technician_assigned",
+    })]);
+  });
+
+  it("forbids a regular account from confirming an accepted dispatch offer", async () => {
+    await expect(homeosRouter.createCaller(createAuthenticatedContext()).operations.assignAcceptedOffer({ offerId: 44 }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(dbTestState.selections).toHaveLength(0);
+    expect(dbTestState.updates).toHaveLength(0);
   });
 
   it("derives operations analytics from persisted request, latest quote, confirmed payment, and active-warranty records", async () => {

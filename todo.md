@@ -105,3 +105,4 @@
 - [x] Record the successful Android APK containing record-derived native Home summaries and revise the Allure-compatible report from build-pending to build-passed.
 - [x] Add protected record-derived operations job-state monitoring and service analytics without mock metrics or automatic dispatch.
 - [x] Add a protected operations analytics contract and console view with persisted job-status, quote-funnel, completion, payment, and active-warranty counts, with focused record-derived tests.
+- [x] Require explicit protected operations assignment after a verified technician accepts a manual dispatch offer, with truthful pending-assignment states and focused transition coverage.

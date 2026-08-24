@@ -1,36 +1,38 @@
-# HomeOS India — Testing Report
+# HomeOS India Automated Testing Report
 
-**Generated:** 24 August 2026, 09:31 UTC  
+**Generated:** 24 August 2026, updated after the manual-assignment release.  
 **Report format:** Allure-compatible raw results in [`allure-results/`](./allure-results/) plus this reviewable summary.  
 **Scope:** The protected HomeOS web/server application and Expo Android client.
 
 ## Automated validation summary
 
-| Area                         | Command or evidence                               | Result | Verified outcome                                                                                                                                              |
-| ---------------------------- | ------------------------------------------------- | -----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Server and web type safety   | `pnpm check`                                      | Passed | TypeScript completed without errors.                                                                                                                          |
-| Server workflow tests        | `pnpm test`                                       | Passed | **31 tests** across 4 files passed, including protected quote, OTP, dispatch, AI assessment, Home Health Score, invoice/warranty, and authorization behavior. |
-| Production web/server bundle | `pnpm build`                                      | Passed | Vite web bundle and Node server bundle were produced.                                                                                                         |
-| Expo client type safety      | `mobile: pnpm check`                              | Passed | Native TypeScript completed without errors.                                                                                                                   |
-| Expo workflow tests          | `mobile: pnpm test`                               | Passed | **8 tests** across 2 files passed.                                                                                                                            |
-| Expo web export              | `mobile: pnpm exec expo export --platform web`    | Passed | Static Expo web export was generated.                                                                                                                         |
-| Android internal APK         | Expo build `b5ddf7f1-7ad3-4069-998a-fe6ce15a7ed0` | Passed | Completed successfully and is internally installable through the Expo build page.                                                                             |
+| Area                         | Command or evidence                               | Result | Verified outcome                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------- | -----: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Server and web type safety   | `pnpm check`                                      | Passed | TypeScript completed without errors.                                                                                                                                                         |
+| Server workflow tests        | `pnpm test`                                       | Passed | **38 tests** across four files passed, including protected quote, OTP, manual dispatch, operator assignment, AI assessment, invoice/warranty, Home Health Score, and authorization behavior. |
+| Production web/server bundle | `pnpm build`                                      | Passed | Vite web bundle and Node server bundle were produced.                                                                                                                                        |
+| Expo client type safety      | `mobile: pnpm check`                              | Passed | Native TypeScript completed without errors.                                                                                                                                                  |
+| Expo workflow tests          | `mobile: pnpm test`                               | Passed | **8 tests** across two files passed.                                                                                                                                                         |
+| Expo web export              | `mobile: pnpm exec expo export --platform web`    | Passed | Static Expo web export was generated.                                                                                                                                                        |
+| Android internal APK         | Expo build `73522b2e-39e1-471d-92fe-6a8263234788` | Passed | Completed successfully and is internally installable through the Expo build page.                                                                                                            |
 
-> **Interpretation:** The automated suite currently contains **39 passing tests** in total: 31 in the web/server project and 8 in the Expo project. The result does not constitute physical-device or payment-provider certification.
+> **Interpretation:** The automated suite currently contains **46 passing tests** in total: 38 in the web/server project and 8 in the Expo project. The result does not constitute physical-device or payment-provider certification.
 
 ## High-value workflow coverage
 
-| Protected behavior                                                                          | Automated coverage status |
-| ------------------------------------------------------------------------------------------- | ------------------------- |
-| Anonymous users cannot approve quotes, start work, complete jobs, or initiate payment       | Passed                    |
-| Customer-owned quote approval and technician-only work start                                | Passed                    |
-| Assigned-technician OTP completion and invalid-OTP rejection                                | Passed                    |
-| Manual dispatch audit persistence and latest-audit operations read                          | Passed                    |
-| Customer dispatch-handoff state remains aggregate and does not expose technician data       | Passed                    |
-| AI assessment accepts text or secure attachment URLs and falls back cautiously              | Passed                    |
-| Home Health Score is bounded, persisted, event-refreshed, and warranty-expiry-aware         | Passed                    |
-| Appliance creation, job completion, and confirmed-warranty events refresh Home Health Score | Passed                    |
-| Native workflow helpers and Expo web export                                                 | Passed                    |
+| Protected behavior                                                                       | Automated coverage status |
+| ---------------------------------------------------------------------------------------- | ------------------------- |
+| Anonymous users cannot approve quotes, start work, complete jobs, or initiate payment    | Passed                    |
+| Customer-owned quote approval and technician-only work start                             | Passed                    |
+| Assigned-technician OTP completion and invalid-OTP rejection                             | Passed                    |
+| Manual dispatch audit persistence and latest-audit operations read                       | Passed                    |
+| Technician acceptance remains pending until an administrator confirms assignment         | Passed                    |
+| Accepted-candidate queue data and administrator-only assignment confirmation             | Passed                    |
+| Customer dispatch-handoff state remains aggregate and does not expose technician data    | Passed                    |
+| AI assessment accepts text or secure attachment URLs and falls back cautiously           | Passed                    |
+| Customer invoice ownership, line items, confirmed payment, and 30-day warranty retrieval | Passed                    |
+| Home Health Score is bounded, persisted, event-refreshed, and warranty-expiry-aware      | Passed                    |
+| Native workflow helpers and Expo web export                                              | Passed                    |
 
 ## Verification boundaries
 
@@ -46,7 +48,7 @@ The following are intentionally **not marked as passed** in this report. They re
 
 ## Build notes
 
-The production build completed successfully. The build emitted a bundle-size advisory for a JavaScript chunk above 500 kB; this is a performance optimization opportunity, not a build failure. Expo emitted a future configuration warning and a post-export shutdown warning; type checking, tests, and web export still completed successfully.
+The production web/server build completed successfully. It emitted a bundle-size advisory for a JavaScript chunk above 500 kB; this is a performance optimization opportunity, not a build failure. Expo type checking, unit tests, web export, and the refreshed internal Android APK build completed successfully.
 
 ## How to open the Allure report
 

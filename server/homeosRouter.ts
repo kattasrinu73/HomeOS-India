@@ -521,7 +521,7 @@ export const homeosRouter = router({
       const db = await databaseOrThrow();
       const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
       if (!technician) throw new TRPCError({ code: "FORBIDDEN", message: "Technician profile required." });
-      const offers = await db.select().from(dispatchOffers).where(and(eq(dispatchOffers.technicianId, technician.id), eq(dispatchOffers.status, "offered"))).orderBy(desc(dispatchOffers.createdAt));
+      const offers = await db.select().from(dispatchOffers).where(and(eq(dispatchOffers.technicianId, technician.id), inArray(dispatchOffers.status, ["offered", "accepted"]))).orderBy(desc(dispatchOffers.createdAt));
       return Promise.all(offers.map(async (offer) => ({ offer, request: (await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.serviceRequestId)).limit(1))[0] ?? null })));
     }),
     jobs: protectedProcedure.query(async ({ ctx }) => {
@@ -536,14 +536,11 @@ export const homeosRouter = router({
         const db = await databaseOrThrow();
         const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
         const [offer] = technician ? await db.select().from(dispatchOffers).where(and(eq(dispatchOffers.id, input.offerId), eq(dispatchOffers.technicianId, technician.id))).limit(1) : [];
-        if (!technician || technician.verificationStatus !== "verified" || !offer || offer.status !== "offered") throw new TRPCError({ code: "FORBIDDEN", message: "This dispatch offer is unavailable to an unverified technician." });
+        if (!technician || technician.verificationStatus !== "verified" || technician.availability !== "available" || !offer || offer.status !== "offered") throw new TRPCError({ code: "FORBIDDEN", message: "This dispatch offer is unavailable to an eligible verified technician." });
         const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.serviceRequestId)).limit(1);
         if (!request || request.assignedTechnicianId || !["submitted", "matched"].includes(request.status)) throw new TRPCError({ code: "CONFLICT", message: "This job has already been assigned." });
         await db.update(dispatchOffers).set({ status: "accepted" }).where(eq(dispatchOffers.id, offer.id));
-        await db.update(dispatchOffers).set({ status: "expired" }).where(and(eq(dispatchOffers.serviceRequestId, request.id), eq(dispatchOffers.status, "offered")));
-        await db.update(serviceRequests).set({ status: "assigned", assignedTechnicianId: technician.id }).where(eq(serviceRequests.id, request.id));
-        await db.insert(notificationRecords).values({ userId: request.customerId, serviceRequestId: request.id, event: "technician_assigned", title: "A qualified technician has accepted", body: "Your selected service professional is preparing to travel to your home." });
-        return { success: true, status: "assigned" as const };
+        return { success: true, status: "matched" as const, assignmentPending: true };
       }),
     declineOffer: protectedProcedure
       .input(z.object({ offerId: z.number().int().positive(), reason: z.enum(["too_far", "wrong_skill", "occupied", "unsupported_service", "safety_concern", "parts_unavailable", "other"]) }))
@@ -832,7 +829,15 @@ export const homeosRouter = router({
       const db = await databaseOrThrow();
       const queue = await db.select().from(serviceRequests).where(inArray(serviceRequests.status, ["submitted", "matched", "assigned"])).orderBy(desc(serviceRequests.createdAt));
       if (!queue.length) return [];
-      const audits = await db.select().from(dispatchRoundAudits).where(inArray(dispatchRoundAudits.serviceRequestId, queue.map((request) => request.id)));
+      const [audits, offers] = await Promise.all([
+        db.select().from(dispatchRoundAudits).where(inArray(dispatchRoundAudits.serviceRequestId, queue.map((request) => request.id))),
+        db.select().from(dispatchOffers).where(inArray(dispatchOffers.serviceRequestId, queue.map((request) => request.id))),
+      ]);
+      const acceptedTechnicianIds = Array.from(new Set(offers.filter((offer) => offer.status === "accepted").map((offer) => offer.technicianId)));
+      const acceptedTechnicians = acceptedTechnicianIds.length
+        ? await db.select({ id: technicians.id, displayName: technicians.displayName, verificationStatus: technicians.verificationStatus }).from(technicians).where(inArray(technicians.id, acceptedTechnicianIds))
+        : [];
+      const acceptedTechnicianById = new Map(acceptedTechnicians.map((technician) => [technician.id, technician]));
       const latestAuditByRequest = new Map<number, typeof audits[number]>();
       for (const audit of audits) {
         const current = latestAuditByRequest.get(audit.serviceRequestId);
@@ -849,9 +854,27 @@ export const homeosRouter = router({
             outcome: audit.outcome,
             createdAt: audit.createdAt,
           } : null,
+          acceptedTechnicians: offers
+            .filter((offer) => offer.serviceRequestId === request.id && offer.status === "accepted")
+            .map((offer) => ({ offerId: offer.id, technician: acceptedTechnicianById.get(offer.technicianId) ?? null })),
         };
       });
     }),
+    assignAcceptedOffer: adminProcedure
+      .input(z.object({ offerId: z.number().int().positive() }))
+      .mutation(async ({ input }) => {
+        const db = await databaseOrThrow();
+        const [offer] = await db.select().from(dispatchOffers).where(eq(dispatchOffers.id, input.offerId)).limit(1);
+        if (!offer || offer.status !== "accepted") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only a persisted accepted offer can be assigned." });
+        const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, offer.serviceRequestId)).limit(1);
+        if (!request || request.assignedTechnicianId || !["submitted", "matched"].includes(request.status)) throw new TRPCError({ code: "CONFLICT", message: "This request is no longer available for assignment." });
+        const [technician] = await db.select().from(technicians).where(eq(technicians.id, offer.technicianId)).limit(1);
+        if (!technician || technician.verificationStatus !== "verified") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "The accepted technician is no longer verified for assignment." });
+        await db.update(dispatchOffers).set({ status: "expired" }).where(and(eq(dispatchOffers.serviceRequestId, request.id), eq(dispatchOffers.status, "offered")));
+        await db.update(serviceRequests).set({ status: "assigned", assignedTechnicianId: technician.id }).where(eq(serviceRequests.id, request.id));
+        await db.insert(notificationRecords).values({ userId: request.customerId, serviceRequestId: request.id, event: "technician_assigned", title: "Your technician is confirmed", body: "A HomeOS operator confirmed your verified technician assignment. The technician can now prepare to travel." });
+        return { success: true, status: "assigned" as const, serviceRequestId: request.id, technicianId: technician.id };
+      }),
     jobBoard: adminProcedure.query(async () => {
       const db = await databaseOrThrow();
       const jobs = await db.select().from(serviceRequests).where(inArray(serviceRequests.status, ["assigned", "en_route", "arrived", "diagnosing", "quote_pending", "quote_approved", "in_progress", "completion_pending"])).orderBy(desc(serviceRequests.updatedAt));

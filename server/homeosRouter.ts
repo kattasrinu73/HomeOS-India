@@ -152,6 +152,19 @@ export const homeosRouter = router({
         const created = await db.select().from(homes).where(and(eq(homes.ownerId, ctx.user.id), eq(homes.label, input.label))).orderBy(desc(homes.id)).limit(1);
         return created[0];
       }),
+    updateCoordinates: protectedProcedure
+      .input(z.object({
+        homeId: z.number().int().positive(),
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [home] = await db.select({ id: homes.id }).from(homes).where(and(eq(homes.id, input.homeId), eq(homes.ownerId, ctx.user.id))).limit(1);
+        if (!home) throw new TRPCError({ code: "FORBIDDEN", message: "You cannot update this home location." });
+        await db.update(homes).set({ latitude: input.latitude.toFixed(7), longitude: input.longitude.toFixed(7) }).where(eq(homes.id, home.id));
+        return { success: true };
+      }),
   }),
   appliances: router({
     list: protectedProcedure

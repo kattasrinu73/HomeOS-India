@@ -71,3 +71,5 @@
 - [x] Keep the deferred native payment surface explicitly provider-gated and prevent it from locally marking a service paid or complete.
 - [x] Add native removal controls for synchronised Passport document records through the protected owner-scoped procedure.
 - [x] Capture optional precise device coordinates during native home setup and persist them through the protected home contract so operations dispatch can use eligible service locations.
+- [x] Let an authenticated native customer update the coordinates of an existing saved home through a protected owner-scoped procedure.
+- [x] Make existing-home native coordinate refresh transactional so local labels update only after protected persistence succeeds and backend failures have distinct feedback.

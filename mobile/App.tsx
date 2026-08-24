@@ -470,13 +470,25 @@ export default function App() {
       Alert.alert("Location permission needed", "Allow location to use your current service address.");
       return;
     }
+    let coordinates: { latitude: number; longitude: number };
     try {
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setNativeCoordinates({ latitude: location.coords.latitude, longitude: location.coords.longitude });
-      setLocationLabel("Current location, Hyderabad");
+      coordinates = { latitude: location.coords.latitude, longitude: location.coords.longitude };
     } catch {
       Alert.alert("Location unavailable", "You can still set your home address manually.");
+      return;
     }
+    if (syncedHome && nativeSyncStatus === "ready") {
+      try {
+        await (homeosApi as any).homeos.homes.updateCoordinates.mutate({ homeId: syncedHome.id, ...coordinates });
+      } catch {
+        Alert.alert("Home location was not updated", "HomeOS could not save this protected location. Your previous saved service location remains unchanged.");
+        return;
+      }
+    }
+    setNativeCoordinates(coordinates);
+    setLocationLabel("Current location, Hyderabad");
+    if (syncedHome && nativeSyncStatus === "ready") void refreshNativeHome();
   };
 
   const signInToNativeHomeos = async () => {

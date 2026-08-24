@@ -9,8 +9,10 @@ const dbTestState = vi.hoisted(() => ({
   updates: [] as Array<{ table: unknown; values: Record<string, unknown> }>,
   inserts: [] as Array<{ table: unknown; values: unknown }>,
 }));
+const assessmentState = vi.hoisted(() => ({ invokeLLM: vi.fn() }));
 
 vi.mock("./db", () => ({ getDb: dbTestState.getDb }));
+vi.mock("./_core/llm", () => ({ invokeLLM: assessmentState.invokeLLM }));
 
 import { homeosRouter } from "./homeosRouter";
 
@@ -75,6 +77,22 @@ describe("HomeOS protected workflow transitions", () => {
     dbTestState.inserts.length = 0;
     dbTestState.getDb.mockReset();
     dbTestState.getDb.mockResolvedValue(createMockDb());
+    assessmentState.invokeLLM.mockReset();
+    assessmentState.invokeLLM.mockResolvedValue({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            category: "ac_appliances",
+            urgency: "medium",
+            possibleDiagnosis: "The appliance needs a qualified inspection.",
+            safetyNote: "Disconnect power if you notice sparks, smoke, or a burning smell.",
+            followUpQuestions: ["When did the issue begin?"],
+            estimateMin: 0,
+            estimateMax: 0,
+          }),
+        },
+      }],
+    });
   });
 
   it("rejects an anonymous quote approval before accessing service records", async () => {
@@ -212,5 +230,52 @@ describe("HomeOS protected workflow transitions", () => {
       id: 19,
       latestDispatchRound: expect.objectContaining({ round: 2, searchRadiusKm: 10, eligibleOfferCount: 2, outcome: "offers_created" }),
     })]);
+  });
+
+  it("sends a text-only protected service description to the structured assessment boundary", async () => {
+    const result = await homeosRouter.createCaller(createAuthenticatedContext()).diagnosis.assess({
+      description: "The AC runs but the room is not cooling.",
+    });
+
+    expect(result).toMatchObject({ category: "ac_appliances", urgency: "medium" });
+    expect(assessmentState.invokeLLM).toHaveBeenCalledWith(expect.objectContaining({
+      model: "claude-haiku-4-5",
+      messages: expect.arrayContaining([expect.objectContaining({ role: "user", content: "The AC runs but the room is not cooling." })]),
+    }));
+  });
+
+  it("sends an attached secure image URL alongside the text description to the structured assessment boundary", async () => {
+    const attachmentUrl = "https://storage.example/homeos/issues/ac-unit.jpg";
+
+    await homeosRouter.createCaller(createAuthenticatedContext()).diagnosis.assess({
+      description: "The AC outdoor unit is making a loud noise.",
+      attachmentUrl,
+    });
+
+    const request = assessmentState.invokeLLM.mock.calls[0]?.[0] as { messages: Array<{ role: string; content: unknown }> };
+    expect(request.messages[1]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "The AC outdoor unit is making a loud noise." },
+        { type: "image_url", image_url: { url: attachmentUrl, detail: "auto" } },
+      ],
+    });
+  });
+
+  it("returns cautious fallback guidance when structured assessment is unavailable", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    assessmentState.invokeLLM.mockRejectedValueOnce(new Error("model unavailable"));
+
+    const result = await homeosRouter.createCaller(createAuthenticatedContext()).diagnosis.assess({
+      description: "There is a smell from the breaker panel.",
+    });
+
+    expect(result).toMatchObject({
+      category: "other",
+      urgency: "medium",
+      estimateMin: 0,
+      estimateMax: 0,
+    });
+    consoleError.mockRestore();
   });
 });

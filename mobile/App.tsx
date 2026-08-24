@@ -96,6 +96,15 @@ type SyncedAppliance = {
   installedYear: number | null;
 };
 
+type NativePassportHistory = {
+  requests: Array<{ id: number; publicId: string; category: string; status: string }>;
+  records: Array<{
+    serviceRequestId: number;
+    invoice: { invoiceNumber: string } | null;
+    warranty: { endsAt: Date | string; status: string } | null;
+  }>;
+};
+
 type NativeRequestDetail = {
   request: SyncedServiceRequest;
   technician: { displayName: string } | null;
@@ -257,6 +266,7 @@ export default function App() {
   const [selectedRequestPublicId, setSelectedRequestPublicId] = useState<string | null>(null);
   const [syncedDocuments, setSyncedDocuments] = useState<SyncedPassportDocument[]>([]);
   const [syncedAppliances, setSyncedAppliances] = useState<SyncedAppliance[]>([]);
+  const [syncedPassportHistory, setSyncedPassportHistory] = useState<NativePassportHistory | null>(null);
   const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
   const [nativeAssessment, setNativeAssessment] = useState<NativeAssessment | null>(null);
   const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
@@ -295,14 +305,16 @@ export default function App() {
       ]);
       setSyncedHome(homes[0] ?? null);
       setSyncedRequests(requests);
-      const [documents, applianceRecords] = homes[0]
+      const [documents, applianceRecords, passportHistory] = homes[0]
         ? await Promise.all([
           (homeosApi as any).homeos.passport.listDocuments.query({ homeId: homes[0].id }) as Promise<SyncedPassportDocument[]>,
           (homeosApi as any).homeos.appliances.list.query({ homeId: homes[0].id }) as Promise<SyncedAppliance[]>,
+          (homeosApi as any).homeos.passport.getForHome.query({ homeId: homes[0].id }) as Promise<NativePassportHistory>,
         ])
-        : [[], []] as [SyncedPassportDocument[], SyncedAppliance[]];
+        : [[], [], null] as [SyncedPassportDocument[], SyncedAppliance[], NativePassportHistory | null];
       setSyncedDocuments(documents);
       setSyncedAppliances(applianceRecords);
+      setSyncedPassportHistory(passportHistory);
       const detailRequest = requests.find((request) => request.publicId === (requestedPublicId ?? selectedRequestPublicId)) ?? requests[0];
       if (detailRequest) setSelectedRequestPublicId(detailRequest.publicId);
       const detail = detailRequest
@@ -316,6 +328,7 @@ export default function App() {
       setSelectedRequestPublicId(null);
       setSyncedDocuments([]);
       setSyncedAppliances([]);
+      setSyncedPassportHistory(null);
       setSyncedRequestDetail(null);
       setNativeSyncStatus("signin_required");
     }
@@ -444,6 +457,7 @@ export default function App() {
     setSyncedRequests([]);
     setSyncedDocuments([]);
     setSyncedAppliances([]);
+    setSyncedPassportHistory(null);
     setSyncedRequestDetail(null);
     setNativeSyncStatus("signin_required");
   };
@@ -810,7 +824,14 @@ export default function App() {
           <View style={styles.passportHero}><View><Text style={styles.passportEyebrow}>YOUR HOME RECORD</Text><Text style={styles.passportTitle}>Everything remembered.</Text><Text style={styles.passportBody}>Service, proof, invoices, and warranty protection in one secure history.</Text></View><View style={styles.passportSeal}><AppIcon name="shield-checkmark" size={27} color={C.white} /></View></View>
           <View style={styles.passportScore}><Text style={styles.metaLabel}>HOME HEALTH SCORE</Text><Text style={styles.passportScoreNumber}>{syncedHome?.healthScore ?? "—"} <Text style={styles.healthSuffix}>/ 100</Text></Text><Text style={styles.passportScoreDetail}>{syncedHome ? `Saved for ${syncedHome.label}.` : "Your score will appear after the signed-in app synchronises your saved home and service records."}</Text></View>
           <SectionTitle title="Service history" />
-          <View style={styles.panel}><Row icon="document-text-outline" title="No synchronised service history yet" detail="Signed-in web service records, proof, invoices, and active warranties will appear here after native backend transport is enabled." /></View>
+          <View style={styles.panel}>{syncedPassportHistory?.requests.length ? syncedPassportHistory.requests.map((request, index) => {
+            const record = syncedPassportHistory.records.find((candidate) => candidate.serviceRequestId === request.id);
+            const protectionDetail = [
+              record?.invoice ? `Invoice ${record.invoice.invoiceNumber}` : null,
+              record?.warranty ? `${record.warranty.status.replaceAll("_", " ")} warranty until ${new Date(record.warranty.endsAt).toLocaleDateString("en-IN")}` : null,
+            ].filter(Boolean).join(" · ") || "Invoice and warranty appear after confirmed payment.";
+            return <View key={request.id}><Row icon="document-text-outline" title={request.category.replaceAll("_", " ")} detail={`${request.publicId} · ${request.status.replaceAll("_", " ")} · ${protectionDetail}`} onPress={() => { setSelectedRequestPublicId(request.publicId); void refreshNativeHome(request.publicId); setScreen("tracking"); }} />{index < syncedPassportHistory.requests.length - 1 ? <View style={styles.panelLine} /> : null}</View>;
+          }) : <Row icon="document-text-outline" title="No synchronised service history yet" detail={nativeSyncStatus === "signin_required" ? "Sign in to view protected service history." : "Completed services, invoices, and active warranties will appear here when they are saved."} />}</View>
           <SectionTitle title="Your documents" />
           <View style={styles.panel}>{syncedDocuments.length ? syncedDocuments.map((document, index) => <View key={document.id}><Row icon="document-attach-outline" title={document.label} detail={`${document.documentType.replaceAll("_", " ")} · ${Math.ceil(document.fileSize / 1024)} KB`} />{index < syncedDocuments.length - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="document-outline" title="No Passport documents synchronised" detail={nativeSyncStatus === "signin_required" ? "Sign in to upload and view protected home documents." : "Add invoices, warranty papers, installation records, and service documents."} />}</View>
           <Press onPress={choosePassportDocument} disabled={nativeDocumentUploading} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeDocumentUploading ? "Securing document…" : "Add Passport document"}</Text><AppIcon name="document-attach-outline" size={18} /></Press>

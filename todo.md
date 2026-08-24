@@ -61,3 +61,5 @@
 - [ ] Keep Stripe sandbox claiming, provider-webhook confirmation, and live payment testing deferred until the owner explicitly requests activation; retain the existing checkout and invoice safeguards.
 - [x] Synchronise customer-owned appliance records in the native client, render them in Home and Passport, and create new records through the protected appliance contract.
 - [x] Let the native customer select a synchronised service request and load that request’s protected detail instead of always using the first record.
+- [x] Synchronise the native Passport service-history section from the protected home-scoped Passport contract, including completed requests, invoices, and warranties.
+- [x] Show both persisted invoice identification and warranty status/date for the same completed request in native Passport history rows.

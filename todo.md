@@ -66,3 +66,4 @@
 - [x] Synchronise protected HomeOS notifications in the native customer account and present persisted read/unread status without sample alerts.
 - [x] Let an authenticated native technician create an itemised protected quote for an assigned job before requesting customer approval.
 - [x] Add protected native technician transitions from assigned through en route, arrival, and diagnosis so an itemised quote can be created at a valid server state.
+- [x] Render the assigned technician identity from the selected protected request detail in native customer tracking instead of a generic pending placeholder.

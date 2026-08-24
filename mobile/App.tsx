@@ -928,6 +928,13 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
   const [acceptingOfferId, setAcceptingOfferId] = useState<number | null>(null);
   const [jobActionId, setJobActionId] = useState<number | null>(null);
   const [proofUploadingId, setProofUploadingId] = useState<number | null>(null);
+  const [quoteDraftJobId, setQuoteDraftJobId] = useState<number | null>(null);
+  const [quoteReason, setQuoteReason] = useState("");
+  const [quoteVisitFee, setQuoteVisitFee] = useState("");
+  const [quoteLabour, setQuoteLabour] = useState("");
+  const [quoteParts, setQuoteParts] = useState("");
+  const [quoteTaxes, setQuoteTaxes] = useState("");
+  const [quoteSendingJobId, setQuoteSendingJobId] = useState<number | null>(null);
 
   const refresh = async () => {
     setState("loading");
@@ -987,6 +994,45 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
     }
   };
 
+  const sendQuote = async (job: SyncedServiceRequest) => {
+    const reason = quoteReason.trim();
+    const enteredItems = [
+      { itemType: "visit_fee", label: "Visit fee", value: quoteVisitFee },
+      { itemType: "labour", label: "Labour", value: quoteLabour },
+      { itemType: "part", label: "Parts", value: quoteParts },
+      { itemType: "tax", label: "Taxes", value: quoteTaxes },
+    ].filter((item) => item.value.trim().length > 0);
+    const items = enteredItems.map((item) => ({ ...item, amount: Number(item.value) }));
+    if (reason.length < 4) {
+      Alert.alert("Add the diagnosis", "Explain the work required before sending an itemised quote.");
+      return;
+    }
+    if (!items.length || items.some((item) => !Number.isSafeInteger(item.amount) || item.amount < 0)) {
+      Alert.alert("Add valid quote amounts", "Enter one or more whole-rupee amounts of ₹0 or more for the applicable line items.");
+      return;
+    }
+    setQuoteSendingJobId(job.id);
+    try {
+      await (homeosApi as any).homeos.technician.createQuote.mutate({
+        serviceRequestId: job.id,
+        reason,
+        items: items.map(({ itemType, label, amount }) => ({ itemType, label, amount })),
+      });
+      setQuoteDraftJobId(null);
+      setQuoteReason("");
+      setQuoteVisitFee("");
+      setQuoteLabour("");
+      setQuoteParts("");
+      setQuoteTaxes("");
+      await refresh();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Quote unavailable", "HomeOS could not send this protected quote. Ensure the job is assigned to your verified account and is ready for diagnosis.");
+    } finally {
+      setQuoteSendingJobId(null);
+    }
+  };
+
   const addAfterWorkProof = async (job: SyncedServiceRequest) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -1019,7 +1065,41 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
     }
   };
 
-  return <SafeAreaView style={styles.app}><StatusBar style="dark" /><ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}><View style={styles.homeTopBar}><View><Text style={styles.eyebrow}>TECHNICIAN WORKSPACE</Text><Text style={styles.greeting}>Protected work queue</Text></View><Press onPress={onBackToCustomer} style={styles.avatar}><AppIcon name="swap-horizontal" size={20} color={C.forest} /></Press></View>{state === "loading" ? <View style={styles.panel}><Row icon="sync-outline" title="Loading technician records" detail="Checking protected offers and assigned jobs." /></View> : state === "signin_required" ? <View style={styles.panel}><Row icon="lock-closed-outline" title="Technician sign-in required" detail="Sign in with a verified technician account before accessing protected jobs and dispatch offers." /></View> : <><SectionTitle title="New dispatch offers" /><View style={styles.panel}>{offers.length ? offers.map((entry, index) => entry.request ? <View key={entry.offer.id}><Row icon="construct-outline" title={entry.request.category.replaceAll("_", " ")} detail={`${entry.request.publicId} · ${entry.request.urgency} priority · Round ${entry.offer.round} within ${entry.offer.searchRadiusKm} km`} />{index < offers.length - 1 ? <View style={styles.panelLine} /> : null}<View style={{ flexDirection: "row", gap: 10, padding: 15, paddingTop: 0 }}><Press onPress={() => void acceptOffer(entry.offer.id)} disabled={acceptingOfferId === entry.offer.id} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>{acceptingOfferId === entry.offer.id ? "Accepting…" : "Accept"}</Text></Press><Press onPress={() => void declineOffer(entry.offer.id)} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>Decline</Text></Press></View></View> : null) : <Row icon="briefcase-outline" title="No live offers" detail="Verified offers matching your availability and skills will appear here." />}</View><SectionTitle title="Assigned work" /><View style={styles.panel}>{jobs.length ? jobs.map((job, index) => <View key={job.id}><Row icon="clipboard-outline" title={job.category.replaceAll("_", " ")} detail={`${job.publicId} · ${job.status.replaceAll("_", " ")} · ${job.urgency} priority`} />{job.status === "quote_approved" ? <View style={{ padding: 15, paddingTop: 0 }}><Press onPress={() => void progressJob(job, "start")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Starting…" : "Start approved work"}</Text><AppIcon name="play-outline" size={18} /></Press></View> : job.status === "in_progress" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Press onPress={() => void addAfterWorkProof(job)} disabled={proofUploadingId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{proofUploadingId === job.id ? "Uploading proof…" : "Add after-work proof"}</Text><AppIcon name="camera-outline" size={18} /></Press><Press onPress={() => void progressJob(job, "completion_ready")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Updating…" : "Request completion OTP"}</Text><AppIcon name="key-outline" size={18} /></Press></View> : job.status === "completion_pending" ? <View style={{ padding: 15, paddingTop: 0 }}><Text style={styles.rowDetail}>Awaiting the customer’s OTP-gated completion confirmation.</Text></View> : null}{index < jobs.length - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="calendar-outline" title="No assigned jobs" detail="Accepted protected offers will appear here." />}</View><Press onPress={() => void refresh()} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Refresh protected work queue</Text></Press></>}</ScrollView></SafeAreaView>;
+  return (
+    <SafeAreaView style={styles.app}>
+      <StatusBar style="dark" />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.homeTopBar}>
+          <View><Text style={styles.eyebrow}>TECHNICIAN WORKSPACE</Text><Text style={styles.greeting}>Protected work queue</Text></View>
+          <Press onPress={onBackToCustomer} style={styles.avatar}><AppIcon name="swap-horizontal" size={20} color={C.forest} /></Press>
+        </View>
+        {state === "loading" ? <View style={styles.panel}><Row icon="sync-outline" title="Loading technician records" detail="Checking protected offers and assigned jobs." /></View> : state === "signin_required" ? <View style={styles.panel}><Row icon="lock-closed-outline" title="Technician sign-in required" detail="Sign in with a verified technician account before accessing protected jobs and dispatch offers." /></View> : <>
+          <SectionTitle title="New dispatch offers" />
+          <View style={styles.panel}>{offers.length ? offers.map((entry, index) => entry.request ? <View key={entry.offer.id}><Row icon="construct-outline" title={entry.request.category.replaceAll("_", " ")} detail={`${entry.request.publicId} · ${entry.request.urgency} priority · Round ${entry.offer.round} within ${entry.offer.searchRadiusKm} km`} />{index < offers.length - 1 ? <View style={styles.panelLine} /> : null}<View style={{ flexDirection: "row", gap: 10, padding: 15, paddingTop: 0 }}><Press onPress={() => void acceptOffer(entry.offer.id)} disabled={acceptingOfferId === entry.offer.id} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>{acceptingOfferId === entry.offer.id ? "Accepting…" : "Accept"}</Text></Press><Press onPress={() => void declineOffer(entry.offer.id)} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>Decline</Text></Press></View></View> : null) : <Row icon="briefcase-outline" title="No live offers" detail="Verified offers matching your availability and skills will appear here." />}</View>
+          <SectionTitle title="Assigned work" />
+          <View style={styles.panel}>{jobs.length ? jobs.map((job, index) => <View key={job.id}>
+            <Row icon="clipboard-outline" title={job.category.replaceAll("_", " ")} detail={`${job.publicId} · ${job.status.replaceAll("_", " ")} · ${job.urgency} priority`} />
+            {["arrived", "diagnosing", "quote_pending"].includes(job.status) ? <View style={{ padding: 15, paddingTop: 0 }}>
+              {quoteDraftJobId === job.id ? <View style={styles.inputPanel}>
+                <Text style={styles.inputLabel}>Diagnosis and work required</Text>
+                <TextInput value={quoteReason} onChangeText={setQuoteReason} placeholder="Explain the diagnosis and proposed work" placeholderTextColor="#98958D" multiline style={[styles.textArea, { minHeight: 72 }]} />
+                <View style={styles.panelLine} />
+                <Text style={[styles.inputLabel, { marginTop: 14 }]}>Itemised amounts (₹)</Text>
+                <TextInput value={quoteVisitFee} onChangeText={setQuoteVisitFee} placeholder="Visit fee" placeholderTextColor="#98958D" keyboardType="number-pad" style={[styles.textArea, { minHeight: 38, paddingVertical: 0 }]} />
+                <TextInput value={quoteLabour} onChangeText={setQuoteLabour} placeholder="Labour" placeholderTextColor="#98958D" keyboardType="number-pad" style={[styles.textArea, { minHeight: 38, paddingVertical: 0 }]} />
+                <TextInput value={quoteParts} onChangeText={setQuoteParts} placeholder="Parts" placeholderTextColor="#98958D" keyboardType="number-pad" style={[styles.textArea, { minHeight: 38, paddingVertical: 0 }]} />
+                <TextInput value={quoteTaxes} onChangeText={setQuoteTaxes} placeholder="Taxes" placeholderTextColor="#98958D" keyboardType="number-pad" style={[styles.textArea, { minHeight: 38, paddingVertical: 0 }]} />
+                <View style={{ marginTop: 12 }}><PrimaryButton disabled={quoteSendingJobId === job.id} label={quoteSendingJobId === job.id ? "Sending protected quote…" : "Send itemised quote"} icon="send-outline" onPress={() => void sendQuote(job)} /></View>
+                <Press onPress={() => setQuoteDraftJobId(null)} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Cancel</Text></Press>
+              </View> : <Press onPress={() => setQuoteDraftJobId(job.id)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{job.status === "quote_pending" ? "Revise itemised quote" : "Create itemised quote"}</Text><AppIcon name="receipt-outline" size={18} /></Press>}
+            </View> : job.status === "quote_approved" ? <View style={{ padding: 15, paddingTop: 0 }}><Press onPress={() => void progressJob(job, "start")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Starting…" : "Start approved work"}</Text><AppIcon name="play-outline" size={18} /></Press></View> : job.status === "in_progress" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Press onPress={() => void addAfterWorkProof(job)} disabled={proofUploadingId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{proofUploadingId === job.id ? "Uploading proof…" : "Add after-work proof"}</Text><AppIcon name="camera-outline" size={18} /></Press><Press onPress={() => void progressJob(job, "completion_ready")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Updating…" : "Request completion OTP"}</Text><AppIcon name="key-outline" size={18} /></Press></View> : job.status === "completion_pending" ? <View style={{ padding: 15, paddingTop: 0 }}><Text style={styles.rowDetail}>Awaiting the customer’s OTP-gated completion confirmation.</Text></View> : null}
+            {index < jobs.length - 1 ? <View style={styles.panelLine} /> : null}
+          </View>) : <Row icon="calendar-outline" title="No assigned jobs" detail="Accepted protected offers will appear here." />}</View>
+          <Press onPress={() => void refresh()} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Refresh protected work queue</Text></Press>
+        </>}
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
 
 function TechnicianWorkspace({ onBackToCustomer, onOpenCustomerJob }: { onBackToCustomer: () => void; onOpenCustomerJob: () => void }) {

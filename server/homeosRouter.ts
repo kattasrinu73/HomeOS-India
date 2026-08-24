@@ -228,6 +228,7 @@ export const homeosRouter = router({
         const db = await databaseOrThrow();
         const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
         if (!technician) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Create a technician profile before updating availability." });
+        if (technician.verificationStatus !== "verified") throw new TRPCError({ code: "FORBIDDEN", message: "Only verified technicians can publish dispatch availability." });
         await db.update(technicians).set({ availability: input.availability }).where(eq(technicians.id, technician.id));
         return { success: true, availability: input.availability };
       }),

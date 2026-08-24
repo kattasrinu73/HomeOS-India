@@ -117,6 +117,7 @@ type SyncedNotification = {
 type NativeAccountProfile = {
   user: { name?: string | null } | null;
   profile: { serviceIntent: "customer" | "technician" } | null;
+  technician: { id: number; displayName: string; verificationStatus: "pending" | "verified" | "suspended"; availability: "offline" | "available" | "busy" } | null;
 };
 
 type NativeRequestDetail = {
@@ -285,6 +286,9 @@ export default function App() {
   const [syncedNotifications, setSyncedNotifications] = useState<SyncedNotification[]>([]);
   const [nativeAccountIntent, setNativeAccountIntent] = useState<"customer" | "technician" | null>(null);
   const [nativeAccountName, setNativeAccountName] = useState<string | null>(null);
+  const [nativeTechnician, setNativeTechnician] = useState<NativeAccountProfile["technician"]>(null);
+  const [technicianApplicationName, setTechnicianApplicationName] = useState("");
+  const [nativeTechnicianActionLoading, setNativeTechnicianActionLoading] = useState(false);
   const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
   const [nativeAssessment, setNativeAssessment] = useState<NativeAssessment | null>(null);
   const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
@@ -329,6 +333,8 @@ export default function App() {
       setSyncedNotifications(notificationRecords);
       setNativeAccountIntent(account.profile?.serviceIntent ?? null);
       setNativeAccountName(account.user?.name?.trim() || null);
+      setNativeTechnician(account.technician);
+      if (!technicianApplicationName.trim() && account.user?.name?.trim()) setTechnicianApplicationName(account.user.name.trim());
       if (account.profile?.serviceIntent) setRole(account.profile.serviceIntent);
       const [documents, applianceRecords, passportHistory] = homes[0]
         ? await Promise.all([
@@ -357,6 +363,8 @@ export default function App() {
       setSyncedNotifications([]);
       setNativeAccountIntent(null);
       setNativeAccountName(null);
+      setNativeTechnician(null);
+      setTechnicianApplicationName("");
       setSyncedRequestDetail(null);
       setNativeSyncStatus("signin_required");
     }
@@ -528,6 +536,8 @@ export default function App() {
     setSyncedNotifications([]);
     setNativeAccountIntent(null);
     setNativeAccountName(null);
+    setNativeTechnician(null);
+    setTechnicianApplicationName("");
     setSyncedRequestDetail(null);
     setRole("customer");
     setNativeSyncStatus("signin_required");
@@ -544,6 +554,40 @@ export default function App() {
       setRole(nextRole);
     } catch {
       Alert.alert("Workspace unavailable", "HomeOS could not save this protected workspace preference right now. Please try again.");
+    }
+  };
+
+  const applyForTechnicianProfile = async () => {
+    const displayName = technicianApplicationName.trim();
+    if (displayName.length < 2) {
+      Alert.alert("Add your professional name", "Enter at least two characters for the technician profile application.");
+      return;
+    }
+    setNativeTechnicianActionLoading(true);
+    try {
+      const technician = await (homeosApi as any).homeos.account.applyTechnician.mutate({ displayName }) as NativeAccountProfile["technician"];
+      setNativeTechnician(technician);
+      Alert.alert("Profile submitted", "Your technician profile is pending HomeOS verification. Offers remain unavailable until verification is complete.");
+    } catch {
+      Alert.alert("Application unavailable", "HomeOS could not save the protected technician profile right now. Please try again.");
+    } finally {
+      setNativeTechnicianActionLoading(false);
+    }
+  };
+
+  const setNativeTechnicianAvailability = async (availability: "offline" | "available" | "busy") => {
+    if (!nativeTechnician || nativeTechnician.verificationStatus !== "verified") {
+      Alert.alert("Verification required", "HomeOS verifies a technician profile before availability can be used for dispatch.");
+      return;
+    }
+    setNativeTechnicianActionLoading(true);
+    try {
+      await (homeosApi as any).homeos.account.setAvailability.mutate({ availability });
+      setNativeTechnician({ ...nativeTechnician, availability });
+    } catch {
+      Alert.alert("Availability unavailable", "HomeOS could not save your protected availability right now. Please try again.");
+    } finally {
+      setNativeTechnicianActionLoading(false);
     }
   };
 
@@ -950,6 +994,8 @@ export default function App() {
         <View style={styles.panel}>{syncedNotifications.length ? syncedNotifications.slice(0, 5).map((notification, index) => <View key={notification.id}><Row icon={notification.readAt ? "notifications-outline" : "notifications"} title={notification.title} detail={`${notification.readAt ? "Read" : "New"} · ${notification.body}`} onPress={() => { if (!notification.readAt) void markNativeNotificationRead(notification.id); }} />{index < Math.min(syncedNotifications.length, 5) - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="notifications-outline" title="No synchronised updates" detail={nativeSyncStatus === "signin_required" ? "Sign in to view protected HomeOS updates." : "Service, payment, and warranty updates will appear here when they are saved."} />}</View>
         <SectionTitle title="App mode" />
         <Press onPress={() => void updateNativeRole("technician")} style={styles.modeSwitch}><View style={styles.modeSwitchIcon}><AppIcon name="construct-outline" size={23} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>Open technician workspace</Text><Text style={styles.rowDetail}>{nativeAccountIntent === "technician" ? "Saved technician workspace preference." : "Review and manage service opportunities."}</Text></View><AppIcon name="arrow-forward" size={18} /></Press>
+        <SectionTitle title="Technician profile" />
+        {nativeTechnician ? <View style={styles.panel}><Row icon="shield-checkmark-outline" title={nativeTechnician.displayName} detail={`Verification: ${nativeTechnician.verificationStatus} · Availability: ${nativeTechnician.availability}`} />{nativeTechnician.verificationStatus === "verified" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Press disabled={nativeTechnicianActionLoading} onPress={() => void setNativeTechnicianAvailability(nativeTechnician.availability === "available" ? "offline" : "available")} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeTechnicianActionLoading ? "Saving availability…" : nativeTechnician.availability === "available" ? "Set unavailable" : "Set available for dispatch"}</Text><AppIcon name={nativeTechnician.availability === "available" ? "pause-outline" : "radio-outline"} size={18} /></Press><Press disabled={nativeTechnicianActionLoading} onPress={() => void setNativeTechnicianAvailability("busy")} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Set busy</Text><AppIcon name="time-outline" size={18} /></Press></View> : <View style={{ padding: 15, paddingTop: 0 }}><Text style={styles.rowDetail}>{nativeTechnician.verificationStatus === "pending" ? "Verification is pending. Dispatch offers and availability remain unavailable until HomeOS verifies this profile." : "This profile is not currently eligible for dispatch. Contact HomeOS support for verification review."}</Text></View>}</View> : <View style={styles.inputPanel}><Text style={styles.inputLabel}>Professional display name</Text><TextInput value={technicianApplicationName} onChangeText={setTechnicianApplicationName} placeholder="Your technician business name" placeholderTextColor="#98958D" style={[styles.textArea, { minHeight: 42, paddingVertical: 0 }]} /><View style={{ marginTop: 12 }}><PrimaryButton disabled={nativeTechnicianActionLoading || nativeSyncStatus !== "ready"} label={nativeTechnicianActionLoading ? "Submitting profile…" : "Apply as a technician"} icon="construct-outline" onPress={applyForTechnicianProfile} /></View><Text style={styles.rowDetail}>New profiles are saved as pending and cannot receive dispatch offers until HomeOS verifies them.</Text></View>}
         <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Notification, maps, payments, and AI diagnosis connect to secure backend services when configured for your pilot.</Text></View>
       </ScrollView>
     );

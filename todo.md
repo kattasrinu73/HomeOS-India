@@ -19,7 +19,7 @@
 - [x] Build a live-tracking experience with a route/ETA interface that can later connect to real location providers.
 - [x] Use secure storage patterns for uploaded issue photos and job-proof attachments.
 - [x] Integrate real payments only after payment-provider configuration is supplied; otherwise make the checkout integration-ready without accepting live funds.
-- [ ] Write and run Vitest coverage for dispatch scoring, quote approval, completion OTP, invoice warranty inclusion, and principal workflow transitions.
+- [x] Write and run Vitest coverage for dispatch scoring, quote approval, completion OTP, invoice warranty inclusion, and principal workflow transitions.
 - [ ] Verify the desktop and mobile user interfaces, resolve errors, and complete a final project checkpoint.
 - [x] Build the customer-facing product as a native-feeling mobile application rather than a public website.
 - [ ] Build the technician-facing product as a role-specific mobile application connected to the shared service backend.
@@ -54,7 +54,7 @@
 - [ ] Expand workflow unit coverage where needed and complete final type, test, visual, and production-release validation.
 - [ ] Complete and verify confirmed-payment handling so invoices and warranties appear end to end, including the customer-visible payment method.
 - [ ] Add visible Passport file type and 10 MB validation feedback, then bind the same secure document workflow to the Expo native client or explicitly revise its delivery scope.
-- [ ] Add router-level Vitest coverage for quote approval, start-work gating, OTP completion, and confirmed-payment invoice/warranty transitions.
+- [x] Add router-level Vitest coverage for quote approval, start-work gating, OTP completion, and confirmed-payment invoice/warranty transitions.
 - [ ] Extend AI assessment to use an uploaded issue attachment and test assessment/upload paths with and without an image.
 - [ ] Connect newly created requests to an actual dispatch-round operator flow, persist real customer selection where required, and test radius expansion plus offer outcomes.
 - [ ] Implement native OAuth session establishment and account-access UI, securely store the resulting HomeOS session token, and verify Passport document upload/listing on an authenticated Android device.

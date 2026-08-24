@@ -347,6 +347,44 @@ describe("HomeOS protected workflow transitions", () => {
     ]));
   });
 
+  it("returns only the owner's persisted itemised confirmed invoice and 30-day warranty", async () => {
+    const warrantyEndsAt = new Date("2026-09-23T06:00:00.000Z");
+    dbTestState.selections.push(
+      [{ id: 19, publicId: "HOS-INVOICE-19", customerId: 101 }],
+      [{ id: 15, serviceRequestId: 19, paymentId: 8, invoiceNumber: "INV-INVOICE-19", technicianIdentity: "Verified technician", warrantyDays: 30, warrantyEndsAt }],
+      [{ id: 8, method: "upi", status: "confirmed", visitFee: 199, labour: 1200, parts: 800, taxes: 180, platformFee: 50, credits: 100, total: 2329 }],
+      [{ id: 4, serviceRequestId: 19, invoiceId: 15, status: "active", startsAt: new Date("2026-08-24T06:00:00.000Z"), endsAt: warrantyEndsAt }],
+    );
+
+    const result = await homeosRouter.createCaller(createAuthenticatedContext()).invoices.getForRequest({ serviceRequestId: 19 });
+
+    expect(result).toMatchObject({
+      invoice: { id: 15, invoiceNumber: "INV-INVOICE-19", technicianIdentity: "Verified technician", warrantyDays: 30 },
+      warranty: { id: 4, status: "active", endsAt: warrantyEndsAt },
+      document: {
+        jobId: "HOS-INVOICE-19",
+        technicianIdentity: "Verified technician",
+        payment: { method: "upi", status: "confirmed", total: 2329 },
+        warranty: { days: 30, endsAt: warrantyEndsAt },
+      },
+    });
+    expect(result?.document.lineItems).toEqual([
+      { type: "visit_fee", label: "Visit fee", amount: 199 },
+      { type: "labour", label: "Labour", amount: 1200 },
+      { type: "parts", label: "Parts", amount: 800 },
+      { type: "taxes", label: "Taxes", amount: 180 },
+      { type: "platform_fee", label: "Platform fee", amount: 50 },
+      { type: "credits", label: "Wallet credits", amount: -100 },
+    ]);
+  });
+
+  it("denies invoice retrieval when the request is not owned by the signed-in customer", async () => {
+    dbTestState.selections.push([]);
+
+    await expect(homeosRouter.createCaller(createAuthenticatedContext()).invoices.getForRequest({ serviceRequestId: 19 }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("sends a text-only protected service description to the structured assessment boundary", async () => {
     const result = await homeosRouter.createCaller(createAuthenticatedContext()).diagnosis.assess({
       description: "The AC runs but the room is not cooling.",

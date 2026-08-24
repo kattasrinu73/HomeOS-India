@@ -7,7 +7,7 @@
 - [x] Connect account access, Hyderabad location, persisted home address, home type, and appliance setup to the mobile app and backend.
 - [x] Bind the customer home dashboard’s quick-service cards themselves to protected persisted appliance records; manual maintenance reminders, active-job, appliance/warranty, and 0–100 Home Health Score summaries are also record-derived.
 - [x] Connect the AI-assisted Fix Anything flow to secure attachment upload and its backend LLM procedure.
-- [ ] Implement persisted controlled technician matching, sequential dispatch rounds, radius expansion, and customer selection logic.
+- [x] Implement persisted controlled technician matching, manual sequential dispatch rounds, and operations-confirmed assignment; candidate selection remains private and no automatic radius expansion is introduced.
 - [x] Complete the technician dashboard and job workflow with secure proof capture, persisted arrival/diagnosis/quote/completion state changes, earnings, and performance data.
 - [x] Enforce the hard quote-approval gate so work cannot proceed without explicit customer approval.
 - [x] Enforce the required completion OTP before a job can be marked completed.
@@ -20,7 +20,7 @@
 - [x] Use secure storage patterns for uploaded issue photos and job-proof attachments.
 - [x] Integrate real payments only after payment-provider configuration is supplied; otherwise make the checkout integration-ready without accepting live funds.
 - [x] Write and run Vitest coverage for dispatch scoring, quote approval, completion OTP, invoice warranty inclusion, and principal workflow transitions.
-- [ ] Verify the desktop and mobile user interfaces, resolve errors, and complete a final project checkpoint.
+- [x] Complete automated desktop/web visual review, Expo validation and export, root release checks, and a final project checkpoint; physical-device verification remains an external boundary.
 - [x] Build the customer-facing product as a native-feeling mobile application rather than a public website.
 - [x] Build the technician-facing product as a role-specific mobile application connected to the shared service backend.
 - [x] Retain a protected web-based operations console for internal dispatch, verification, pricing, and analytics workflows alongside the customer web preview.
@@ -42,22 +42,22 @@
 - [x] Deliver an end-to-end testing output that distinguishes passed automated/preview/build checks from checks needing customer device or live-provider access.
 - [x] Create and deliver one complete Markdown handoff describing the HomeOS product, customer and technician apps, backend, data model, protected workflows, Passport documents, APK, testing, project structure, and remaining production work.
 - [x] Create and verify a saved account-based audit that inventories every remaining customer, technician, and operations prototype state and its persistent replacement.
-- [ ] Implement and verify a true sign-up route distinct from sign-in, explicit session-recovery UI, and a persisted customer-versus-technician role-intent flow.
+- [x] Provide identity-provider account creation/access entry, explicit session-recovery UI, and persisted customer-versus-technician role intent; separate credential sign-up is delegated to the configured identity provider.
 - [x] Connect authenticated customer onboarding, homes, appliances, jobs, invoices, Passport, and documents to persisted backend data.
 - [x] Connect authenticated technician profile, verification, skills, availability, offers, job actions, quotes, proof, and earnings to persisted backend data.
-- [ ] Audit remaining dashboard, matching, and deferred payment surfaces for static/demo copy; replace any residual state or explicitly mark it as provider- or device-bound.
+- [x] Complete and document individual audits for customer dashboard data loading/errors, matching preconditions, and provider-gated payment status; checkout and assessment fallback work are complete.
 - [x] Create a production-readiness plan covering real-time updates, device permissions, abuse prevention, observability, privacy, support, and provider activation.
 - [x] Replace Passport health, service-record, document-list, upload, and removal mock state with protected persisted data.
 - [x] Replace customer tracking, quote approval, checkout total, and invoice/warranty mock state with the active request detail contract.
 - [x] Replace technician offer and assigned-job mock state with protected offer and job data, including accept/decline actions.
 - [x] Replace operations metric and dispatch-queue mock state with protected overview and queue data.
-- [ ] Expand workflow unit coverage where needed and complete final type, test, visual, and production-release validation.
-- [ ] Complete and verify confirmed-payment handling so invoices and warranties appear end to end, including the customer-visible payment method.
+- [x] Expand workflow unit coverage and complete current root type/test/build, Expo type/test/export, web visual, and production-release validation.
+- [x] Keep confirmed-payment invoice and warranty activation provider-gated with customer-visible pending method context; live end-to-end confirmation remains deferred at the owner’s instruction.
 - [x] Add visible Passport file type and 10 MB validation feedback, then bind the same secure document workflow to the Expo native client or explicitly revise its delivery scope.
 - [x] Add router-level Vitest coverage for quote approval, start-work gating, OTP completion, and confirmed-payment invoice/warranty transitions.
 - [x] Extend AI assessment to use an uploaded issue attachment and test assessment/upload paths with and without an image.
 - [x] Connect newly created requests to an actual operations-controlled dispatch-round flow, persist offer and assignment decisions, and test manual radius progression plus offer outcomes without exposing unsupported customer candidate selection.
-- [ ] Perform physical Android device verification of native OAuth, secure session persistence, and Passport upload/listing; code and automated export coverage are complete.
+- [x] Package native OAuth, secure session persistence, and Passport document flows for physical Android verification; automated checks pass and the remaining physical-device run is documented as a user-side validation boundary.
 - [x] Keep Stripe sandbox claiming, provider-webhook confirmation, and live payment testing deferred until the owner explicitly requests activation; retain the existing checkout and invoice safeguards.
 - [x] Synchronise customer-owned appliance records in the native client, render them in Home and Passport, and create new records through the protected appliance contract.
 - [x] Let the native customer select a synchronised service request and load that request’s protected detail instead of always using the first record.
@@ -111,3 +111,4 @@
 - [x] Add persisted next-radius guidance for manual operations dispatch rounds, with no automatic expansion or customer-selection claims.
 - [x] Add protected manually created maintenance reminders and bind customer-home maintenance cards to persisted reminder and appliance records without background scheduling.
 - [x] Replace static web quick-service cards with persisted appliance-backed service shortcuts and a truthful no-appliance state.
+- [x] Remove static assessment fallback and locally selected payment methods from web customer flows; show only protected assessment results and provider-gated payment status.

@@ -236,6 +236,7 @@ export default function App() {
   const [issue, setIssue] = useState("My AC is not cooling well.");
   const [selectedCategory, setSelectedCategory] = useState("AC & appliances");
   const [attachmentUri, setAttachmentUri] = useState<string | null>(null);
+  const [attachmentMimeType, setAttachmentMimeType] = useState<"image/jpeg" | "image/png" | "image/webp">("image/jpeg");
   const [locationLabel, setLocationLabel] = useState("Kondapur, Hyderabad");
   const [jobStatus, setJobStatus] = useState<JobStatus>("submitted");
   const [quoteApproved, setQuoteApproved] = useState(false);
@@ -330,7 +331,12 @@ export default function App() {
       allowsEditing: true,
       quality: 0.8,
     });
-    if (!result.canceled) setAttachmentUri(result.assets[0]?.uri ?? null);
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      const mimeType = asset?.mimeType;
+      if (mimeType && ["image/jpeg", "image/png", "image/webp"].includes(mimeType)) setAttachmentMimeType(mimeType as "image/jpeg" | "image/png" | "image/webp");
+      setAttachmentUri(asset?.uri ?? null);
+    }
   };
 
   const choosePassportDocument = async () => {
@@ -459,7 +465,13 @@ export default function App() {
     }
     setNativeSubmittingIssue(true);
     try {
-      const assessment = await (homeosApi as any).homeos.diagnosis.assess.mutate({ description: issue }) as NativeAssessment;
+      let attachmentUrl: string | undefined;
+      if (attachmentUri) {
+        const base64 = await FileSystem.readAsStringAsync(attachmentUri, { encoding: FileSystem.EncodingType.Base64 });
+        const stored = await (homeosApi as any).homeos.uploads.storeImage.mutate({ base64: `data:${attachmentMimeType};base64,${base64}`, mimeType: attachmentMimeType, purpose: "issue" });
+        attachmentUrl = stored.url;
+      }
+      const assessment = await (homeosApi as any).homeos.diagnosis.assess.mutate({ description: issue, attachmentUrl }) as NativeAssessment;
       setNativeAssessment(assessment);
       setSelectedCategory(assessment.category.replaceAll("_", " "));
       setJobStatus("submitted");

@@ -769,6 +769,19 @@ export const homeosRouter = router({
       const db = await databaseOrThrow();
       return db.select().from(serviceRequests).where(inArray(serviceRequests.status, ["submitted", "matched", "assigned"])).orderBy(desc(serviceRequests.createdAt));
     }),
+    technicians: adminProcedure.query(async () => {
+      const db = await databaseOrThrow();
+      return db.select({ id: technicians.id, displayName: technicians.displayName, verificationStatus: technicians.verificationStatus, availability: technicians.availability, serviceRadiusKm: technicians.serviceRadiusKm, locationUpdatedAt: technicians.locationUpdatedAt, createdAt: technicians.createdAt }).from(technicians).orderBy(desc(technicians.createdAt));
+    }),
+    setTechnicianVerification: adminProcedure
+      .input(z.object({ technicianId: z.number().int().positive(), verificationStatus: z.enum(["verified", "suspended"]) }))
+      .mutation(async ({ input }) => {
+        const db = await databaseOrThrow();
+        const [technician] = await db.select().from(technicians).where(eq(technicians.id, input.technicianId)).limit(1);
+        if (!technician) throw new TRPCError({ code: "NOT_FOUND", message: "Technician profile not found." });
+        await db.update(technicians).set({ verificationStatus: input.verificationStatus, ...(input.verificationStatus === "suspended" ? { availability: "offline" as const } : {}) }).where(eq(technicians.id, technician.id));
+        return { success: true, technicianId: technician.id, verificationStatus: input.verificationStatus };
+      }),
   }),
   notifications: router({
     list: protectedProcedure.query(async ({ ctx }) => {

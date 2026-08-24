@@ -115,6 +115,7 @@ type SyncedNotification = {
 };
 
 type NativeAccountProfile = {
+  user: { name?: string | null } | null;
   profile: { serviceIntent: "customer" | "technician" } | null;
 };
 
@@ -283,6 +284,7 @@ export default function App() {
   const [syncedPassportHistory, setSyncedPassportHistory] = useState<NativePassportHistory | null>(null);
   const [syncedNotifications, setSyncedNotifications] = useState<SyncedNotification[]>([]);
   const [nativeAccountIntent, setNativeAccountIntent] = useState<"customer" | "technician" | null>(null);
+  const [nativeAccountName, setNativeAccountName] = useState<string | null>(null);
   const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
   const [nativeAssessment, setNativeAssessment] = useState<NativeAssessment | null>(null);
   const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
@@ -326,6 +328,7 @@ export default function App() {
       setSyncedRequests(requests);
       setSyncedNotifications(notificationRecords);
       setNativeAccountIntent(account.profile?.serviceIntent ?? null);
+      setNativeAccountName(account.user?.name?.trim() || null);
       if (account.profile?.serviceIntent) setRole(account.profile.serviceIntent);
       const [documents, applianceRecords, passportHistory] = homes[0]
         ? await Promise.all([
@@ -353,6 +356,7 @@ export default function App() {
       setSyncedPassportHistory(null);
       setSyncedNotifications([]);
       setNativeAccountIntent(null);
+      setNativeAccountName(null);
       setSyncedRequestDetail(null);
       setNativeSyncStatus("signin_required");
     }
@@ -523,6 +527,7 @@ export default function App() {
     setSyncedPassportHistory(null);
     setSyncedNotifications([]);
     setNativeAccountIntent(null);
+    setNativeAccountName(null);
     setSyncedRequestDetail(null);
     setRole("customer");
     setNativeSyncStatus("signin_required");
@@ -709,10 +714,10 @@ export default function App() {
           <View style={styles.homeTopBar}>
             <View>
               <Text style={styles.eyebrow}>HOMEOS INDIA</Text>
-              <Text style={styles.greeting}>Good morning</Text>
+              <Text style={styles.greeting}>{nativeAccountName ? `Good morning, ${nativeAccountName.split(" ")[0]}` : "Good morning"}</Text>
             </View>
             <Press onPress={() => setOnboardingVisible(true)} style={styles.avatar}>
-              <Text style={styles.avatarText}>S</Text>
+              <Text style={styles.avatarText}>{nativeAccountName?.charAt(0).toUpperCase() ?? "H"}</Text>
             </Press>
           </View>
           <Press onPress={useLocation} style={styles.locationLine}>
@@ -937,7 +942,7 @@ export default function App() {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <ScreenHeader title="Account" />
-        <View style={styles.profileHeader}><View style={styles.profileAvatar}><Text style={styles.profileInitial}>S</Text></View><View><Text style={styles.profileName}>Your HomeOS account</Text><Text style={styles.profileDetail}>Homeowner · Hyderabad</Text></View></View>
+        <View style={styles.profileHeader}><View style={styles.profileAvatar}><Text style={styles.profileInitial}>{nativeAccountName?.charAt(0).toUpperCase() ?? "H"}</Text></View><View><Text style={styles.profileName}>{nativeAccountName ?? "Your HomeOS account"}</Text><Text style={styles.profileDetail}>{nativeAccountName ? "Signed-in HomeOS account" : "Sign in to synchronise your account identity."}</Text></View></View>
         <SectionTitle title="Your home" />
         <View style={styles.panel}><Row icon="home-outline" title="Home setup" detail={syncedHome ? `${syncedHome.label} · ${syncedHome.locality}, ${syncedHome.city}` : "Address, home type, and appliances"} onPress={() => setOnboardingVisible(true)} /><View style={styles.panelLine} /><Row icon="location-outline" title="Service location" detail={syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel} onPress={useLocation} /><View style={styles.panelLine} /><Row icon="sync-outline" title="Account synchronisation" detail={nativeSyncStatus === "ready" ? "Signed in and loading HomeOS records" : nativeSyncStatus === "loading" ? "Checking your secure session…" : nativeSyncStatus === "signin_required" ? "Sign in is required to load your HomeOS records" : "HomeOS API endpoint is unavailable"} onPress={() => void refreshNativeHome()} /></View>
         {nativeSyncStatus === "signin_required" ? <PrimaryButton disabled={nativeLoginLoading} label={nativeLoginLoading ? "Opening secure sign-in…" : "Sign in to HomeOS"} icon="lock-closed-outline" onPress={signInToNativeHomeos} /> : nativeSyncStatus === "ready" ? <Press onPress={() => void signOutOfNativeHomeos()} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Sign out of this device</Text></Press> : null}

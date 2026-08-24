@@ -78,3 +78,4 @@
 - [x] Remove the obsolete unrendered local technician demo so only the protected NativeTechnicianWorkspace remains in the Android client.
 - [x] Show an authenticated technician a protected persisted performance summary based only on assigned completed jobs and confirmed payment records.
 - [x] Derive every visible native technician summary metric from assigned job records and confirmed payments, with focused aggregation coverage.
+- [x] Synchronise and display the signed-in protected account identity in the native customer app instead of generic initials and greeting copy.

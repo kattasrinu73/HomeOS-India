@@ -87,6 +87,16 @@ type SyncedPassportDocument = {
   fileSize: number;
 };
 
+type NativeRequestDetail = {
+  request: SyncedServiceRequest;
+  technician: { displayName: string } | null;
+  quote: { id: number; reason: string; total: number; status: string } | null;
+  quoteItems: Array<{ id: number; label: string; amount: number; itemType: string }>;
+  payment: { method: string; status: string; visitFee: number; labour: number; parts: number; taxes: number; platformFee: number; credits: number; total: number } | null;
+  invoice: { invoiceNumber: string; technicianIdentity: string; warrantyDays: number; warrantyEndsAt: Date | string } | null;
+  warranty: { endsAt: Date | string; status: string } | null;
+};
+
 type NativeAssessment = {
   category: "electrical" | "plumbing" | "ac_appliances" | "carpentry" | "cleaning" | "ro" | "painting" | "other";
   urgency: "low" | "medium" | "high" | "emergency";
@@ -235,10 +245,14 @@ export default function App() {
   const [syncedHome, setSyncedHome] = useState<SyncedHome | null>(null);
   const [syncedRequests, setSyncedRequests] = useState<SyncedServiceRequest[]>([]);
   const [syncedDocuments, setSyncedDocuments] = useState<SyncedPassportDocument[]>([]);
+  const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
   const [nativeAssessment, setNativeAssessment] = useState<NativeAssessment | null>(null);
   const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
   const [nativeCreatingRequest, setNativeCreatingRequest] = useState(false);
   const [nativeDocumentUploading, setNativeDocumentUploading] = useState(false);
+  const [nativeHomeSaving, setNativeHomeSaving] = useState(false);
+  const [nativeHomeAddress, setNativeHomeAddress] = useState("");
+  const [nativeHomeType, setNativeHomeType] = useState<"apartment" | "independent_house" | "villa" | "other">("apartment");
   const [nativeSyncStatus, setNativeSyncStatus] = useState<"loading" | "ready" | "signin_required" | "unavailable">("loading");
 
   const warrantyEnd = useMemo(() => warrantyEndsOn(new Date()), []);
@@ -267,11 +281,16 @@ export default function App() {
         ? await (homeosApi as any).homeos.passport.listDocuments.query({ homeId: homes[0].id }) as SyncedPassportDocument[]
         : [];
       setSyncedDocuments(documents);
+      const detail = requests[0]
+        ? await (homeosApi as any).homeos.requests.detail.query({ publicId: requests[0].publicId }) as NativeRequestDetail
+        : null;
+      setSyncedRequestDetail(detail);
       setNativeSyncStatus("ready");
     } catch {
       setSyncedHome(null);
       setSyncedRequests([]);
       setSyncedDocuments([]);
+      setSyncedRequestDetail(null);
       setNativeSyncStatus("signin_required");
     }
   };
@@ -374,6 +393,36 @@ export default function App() {
     }
   };
 
+  const saveNativeHomeSetup = async () => {
+    const address = nativeHomeAddress.trim() || locationLabel.trim();
+    if (!address || address === "Set service location") {
+      Alert.alert("Add your address", "Enter the address for the home you want HomeOS to protect.");
+      return;
+    }
+    if (nativeSyncStatus !== "ready") {
+      Alert.alert("Sign in required", "Sign in with your HomeOS account before saving a protected home record.");
+      return;
+    }
+    setNativeHomeSaving(true);
+    try {
+      await (homeosApi as any).homeos.homes.create.mutate({
+        label: "My home",
+        addressLine1: address,
+        locality: address.split(",")[0]?.trim() || address,
+        city: "Hyderabad",
+        homeType: nativeHomeType,
+      });
+      await refreshNativeHome();
+      setOnboardingVisible(false);
+      setHomeStep(0);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Home setup unavailable", "HomeOS could not save this protected home record right now. Please try again.");
+    } finally {
+      setNativeHomeSaving(false);
+    }
+  };
+
   const submitIssue = async () => {
     if (!issue.trim()) {
       Alert.alert("Describe the issue", "Tell us what is happening at home so we can guide you.");
@@ -433,11 +482,19 @@ export default function App() {
     setScreen("quote");
   };
 
-  const approveQuote = () => {
-    if (!canTransitionJob("quote_approved", "in_progress", { quoteApproved: true, completionOtp: otp })) return;
-    setQuoteApproved(true);
-    setJobStatus("in_progress");
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const approveQuote = async () => {
+    if (!syncedRequestDetail?.quote) {
+      Alert.alert("Quote unavailable", "A protected technician quote must be available before approval.");
+      return;
+    }
+    try {
+      await (homeosApi as any).homeos.requests.approveQuote.mutate({ quoteId: syncedRequestDetail.quote.id });
+      await refreshNativeHome();
+      setQuoteApproved(true);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Approval unavailable", "HomeOS could not approve this quote right now. Please try again.");
+    }
   };
 
   const verifyOtp = () => {
@@ -597,12 +654,12 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Review quote" onBack={() => setScreen("tracking")} />
           <Pill label="ACTION REQUIRED" tone="warm" />
-          <Text style={styles.flowTitle}>Additional work requested.</Text>
-          <Text style={styles.flowSubtitle}>The technician has diagnosed a likely capacitor replacement. Review every line before work can begin.</Text>
-          <View style={styles.quotePanel}><Text style={styles.quoteReason}>Reason: Capacitor replacement</Text>{invoiceLines.slice(0, 3).map(([label, amount]) => <View key={label} style={styles.billLine}><Text style={styles.billLabel}>{label}</Text><Text style={styles.billAmount}>{formatIndianRupees(amount)}</Text></View>)}<View style={styles.panelLine} /><View style={styles.billLine}><Text style={styles.billTotal}>Total</Text><Text style={styles.billTotal}>{formatIndianRupees(invoiceTotal)}</Text></View></View>
+          <Text style={styles.flowTitle}>{syncedRequestDetail?.quote ? "Review protected quote." : "No quote available yet."}</Text>
+          <Text style={styles.flowSubtitle}>{syncedRequestDetail?.quote ? "Review every item sent by the assigned technician. Work cannot begin until you explicitly approve." : "The technician’s itemised diagnosis and quote will appear here after it is securely sent."}</Text>
+          {syncedRequestDetail?.quote ? <View style={styles.quotePanel}><Text style={styles.quoteReason}>Reason: {syncedRequestDetail.quote.reason}</Text>{syncedRequestDetail.quoteItems.map((item) => <View key={item.id} style={styles.billLine}><Text style={styles.billLabel}>{item.label}</Text><Text style={styles.billAmount}>{formatIndianRupees(item.amount)}</Text></View>)}<View style={styles.panelLine} /><View style={styles.billLine}><Text style={styles.billTotal}>Total</Text><Text style={styles.billTotal}>{formatIndianRupees(syncedRequestDetail.quote.total)}</Text></View></View> : <View style={styles.panel}><Row icon="receipt-outline" title="Awaiting itemised quote" detail="The verified assigned technician must send a diagnosis and itemised quote before you can approve work." /></View>}
           <View style={styles.hardGate}><AppIcon name="lock-closed-outline" size={20} color={C.coral} /><View style={styles.hardGateCopy}><Text style={styles.hardGateTitle}>Approval is required</Text><Text style={styles.hardGateText}>The technician cannot start this work unless you explicitly approve this quote.</Text></View></View>
-          {jobStatus === "in_progress" ? <View style={styles.approvedState}><AppIcon name="checkmark-circle" size={24} color={C.success} /><View><Text style={styles.approvedTitle}>Quote approved</Text><Text style={styles.approvedText}>Work is now in progress. You will be asked for a completion OTP when it is ready.</Text></View></View> : <PrimaryButton label="Approve quote & start" icon="checkmark" onPress={approveQuote} />}
-          {jobStatus === "in_progress" ? <PrimaryButton label="Work complete — enter OTP" icon="key-outline" onPress={() => { setJobStatus("completion_pending"); setScreen("otp"); }} /> : null}
+          {syncedRequestDetail?.request.status === "quote_approved" || syncedRequestDetail?.request.status === "in_progress" ? <View style={styles.approvedState}><AppIcon name="checkmark-circle" size={24} color={C.success} /><View><Text style={styles.approvedTitle}>Quote approved</Text><Text style={styles.approvedText}>Work can now proceed. You will be asked for a completion OTP when the technician marks it ready.</Text></View></View> : <PrimaryButton disabled={!syncedRequestDetail?.quote} label="Approve quote & start" icon="checkmark" onPress={approveQuote} />}
+          {syncedRequestDetail?.request.status === "completion_pending" ? <PrimaryButton label="Work complete — enter OTP" icon="key-outline" onPress={() => setScreen("otp")} /> : null}
           <Press onPress={() => Alert.alert("Quote declined", "Your request will stay open so you can ask for another qualified technician.")} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Reject and request another technician</Text></Press>
         </ScrollView>
       );
@@ -637,10 +694,9 @@ export default function App() {
       return (
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Service complete" onBack={goHome} />
-          <View style={styles.completeBadge}><AppIcon name="checkmark" size={30} color={C.white} /></View><Text style={[styles.flowTitle, styles.centered]}>Your home is protected.</Text><Text style={[styles.flowSubtitle, styles.centered]}>Payment is confirmed and your service record is ready.</Text>
-          <View style={styles.invoiceCard}><View style={styles.invoiceTop}><View><Text style={styles.invoiceBrand}>HOMEOS</Text><Text style={styles.invoiceTitle}>Digital invoice</Text></View><Pill label="PAID" tone="success" /></View><View style={styles.invoiceMeta}><Text style={styles.metaLabel}>JOB ID</Text><Text style={styles.invoiceMetaValue}>HOS-AC-260821</Text><Text style={styles.metaLabel}>TECHNICIAN</Text><Text style={styles.invoiceMetaValue}>Ramesh Kumar · AC & appliances</Text></View>{invoiceLines.map(([label, amount]) => <View key={label} style={styles.billLine}><Text style={styles.billLabel}>{label}</Text><Text style={styles.billAmount}>{formatIndianRupees(amount)}</Text></View>)}<View style={styles.panelLine} /><View style={styles.billLine}><Text style={styles.billTotal}>Total paid</Text><Text style={styles.billTotal}>{formatIndianRupees(invoiceTotal)}</Text></View><View style={styles.warrantyInvoice}><AppIcon name="shield-checkmark" size={24} color={C.success} /><View><Text style={styles.warrantyInvoiceTitle}>30-day service warranty</Text><Text style={styles.warrantyInvoiceText}>Active through {warrantyEnd.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</Text></View></View></View>
+          <View style={styles.completeBadge}><AppIcon name={syncedRequestDetail?.invoice ? "checkmark" : "time-outline"} size={30} color={C.white} /></View><Text style={[styles.flowTitle, styles.centered]}>{syncedRequestDetail?.invoice ? "Your home is protected." : "Invoice pending confirmation."}</Text><Text style={[styles.flowSubtitle, styles.centered]}>{syncedRequestDetail?.invoice ? "Payment is confirmed and your service record is ready." : "An invoice and 30-day warranty appear after the payment provider confirms the protected payment."}</Text>
+          {syncedRequestDetail?.invoice && syncedRequestDetail.payment ? <View style={styles.invoiceCard}><View style={styles.invoiceTop}><View><Text style={styles.invoiceBrand}>HOMEOS</Text><Text style={styles.invoiceTitle}>Digital invoice</Text></View><Pill label={syncedRequestDetail.payment.status.toUpperCase()} tone="success" /></View><View style={styles.invoiceMeta}><Text style={styles.metaLabel}>JOB ID</Text><Text style={styles.invoiceMetaValue}>{syncedRequestDetail.request.publicId}</Text><Text style={styles.metaLabel}>TECHNICIAN</Text><Text style={styles.invoiceMetaValue}>{syncedRequestDetail.invoice.technicianIdentity}</Text></View>{([['Visit fee', syncedRequestDetail.payment.visitFee], ['Labour', syncedRequestDetail.payment.labour], ['Parts', syncedRequestDetail.payment.parts], ['Taxes', syncedRequestDetail.payment.taxes], ['Platform fee', syncedRequestDetail.payment.platformFee], ['Wallet credits', -syncedRequestDetail.payment.credits]] as const).map(([label, amount]) => <View key={label} style={styles.billLine}><Text style={styles.billLabel}>{label}</Text><Text style={styles.billAmount}>{formatIndianRupees(amount)}</Text></View>)}<View style={styles.panelLine} /><View style={styles.billLine}><Text style={styles.billTotal}>Total paid · {syncedRequestDetail.payment.method.toUpperCase()}</Text><Text style={styles.billTotal}>{formatIndianRupees(syncedRequestDetail.payment.total)}</Text></View><View style={styles.warrantyInvoice}><AppIcon name="shield-checkmark" size={24} color={C.success} /><View><Text style={styles.warrantyInvoiceTitle}>{syncedRequestDetail.invoice.warrantyDays}-day service warranty</Text><Text style={styles.warrantyInvoiceText}>Active through {new Date(syncedRequestDetail.warranty?.endsAt ?? syncedRequestDetail.invoice.warrantyEndsAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</Text></View></View></View> : <View style={styles.panel}><Row icon="receipt-outline" title="No confirmed invoice yet" detail="Payment method, technician identity, itemised charges, invoice number, and warranty dates appear here only after protected provider confirmation." /></View>}
           <PrimaryButton label="View Home Service Passport" icon="arrow-forward" onPress={() => { setTab("passport"); setScreen("passport"); }} />
-          <Press onPress={() => Alert.alert("Invoice download", "A downloadable PDF will be generated after the production invoice service is connected.")} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Download invoice</Text></Press>
         </ScrollView>
       );
     }
@@ -685,7 +741,7 @@ export default function App() {
   };
 
   if (role === "technician") {
-    return <TechnicianWorkspace onBackToCustomer={() => setRole("customer")} onOpenCustomerJob={() => { setRole("customer"); setScreen("tracking"); }} />;
+    return <NativeTechnicianWorkspace onBackToCustomer={() => setRole("customer")} />;
   }
 
   return (
@@ -698,9 +754,9 @@ export default function App() {
           <View style={styles.onboardingSheet}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetTop}><View><Text style={styles.eyebrow}>HOME SETUP</Text><Text style={styles.sheetTitle}>{homeStep === 0 ? "Set up your home" : homeStep === 1 ? "Choose home type" : "Add appliances"}</Text></View><Press onPress={() => setOnboardingVisible(false)} style={styles.headerIcon}><AppIcon name="close" size={22} /></Press></View>
-            {homeStep === 0 ? <><Text style={styles.sheetBody}>Save the address you want us to care for. You can manage more homes later, including a parents’ home.</Text><View style={styles.locationSetup}><AppIcon name="location-outline" size={22} color={C.coral} /><View><Text style={styles.rowTitle}>{locationLabel}</Text><Text style={styles.rowDetail}>Tap to use your current location or enter it manually.</Text></View></View><PrimaryButton label="Use current location" icon="location-outline" onPress={useLocation} /></> : null}
-            {homeStep === 1 ? <><Text style={styles.sheetBody}>This helps us tailor maintenance recommendations and service access notes.</Text><View style={styles.homeTypeGrid}>{["Apartment", "Independent house", "Villa", "Other"].map((homeType) => <Press key={homeType} onPress={() => setHomeStep(2)} style={styles.homeTypeCard}><AppIcon name={homeType === "Apartment" ? "business-outline" : "home-outline"} size={22} /><Text style={styles.homeTypeText}>{homeType}</Text></Press>)}</View></> : null}
-            {homeStep === 2 ? <><Text style={styles.sheetBody}>Add appliances now or skip and record them after your first service.</Text><View style={styles.applianceChoice}><AppIcon name="snow-outline" size={22} /><Text style={styles.rowTitle}>Air conditioner</Text><Pill label="ADD" tone="dark" /></View><View style={styles.applianceChoice}><AppIcon name="water-outline" size={22} /><Text style={styles.rowTitle}>Water purifier</Text><Pill label="ADD" /></View><PrimaryButton label="Save home setup" icon="checkmark" onPress={() => { setOnboardingVisible(false); setHomeStep(0); }} /></> : null}
+            {homeStep === 0 ? <><Text style={styles.sheetBody}>Save the address you want us to care for. You can manage more homes later, including a parents’ home.</Text><TextInput value={nativeHomeAddress} onChangeText={setNativeHomeAddress} placeholder="House or building, locality" placeholderTextColor="#98958D" style={[styles.textArea, { minHeight: 54, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 12, backgroundColor: C.paper, marginBottom: 14 }]} /><View style={styles.locationSetup}><AppIcon name="location-outline" size={22} color={C.coral} /><View><Text style={styles.rowTitle}>{locationLabel}</Text><Text style={styles.rowDetail}>Use your current location or enter the address manually above.</Text></View></View><PrimaryButton label="Use current location" icon="location-outline" onPress={useLocation} /></> : null}
+            {homeStep === 1 ? <><Text style={styles.sheetBody}>This helps us tailor maintenance recommendations and service access notes.</Text><View style={styles.homeTypeGrid}>{([['Apartment', 'apartment'], ['Independent house', 'independent_house'], ['Villa', 'villa'], ['Other', 'other']] as const).map(([homeType, value]) => <Press key={value} onPress={() => { setNativeHomeType(value); setHomeStep(2); }} style={[styles.homeTypeCard, nativeHomeType === value && { borderColor: C.forest, backgroundColor: C.sage }]}><AppIcon name={value === "apartment" ? "business-outline" : "home-outline"} size={22} /><Text style={styles.homeTypeText}>{homeType}</Text></Press>)}</View></> : null}
+            {homeStep === 2 ? <><Text style={styles.sheetBody}>Save this protected home now. Appliance records can be added after the signed-in native account sync is complete.</Text><View style={styles.applianceChoice}><AppIcon name="shield-checkmark-outline" size={22} /><Text style={styles.rowTitle}>Protected home record</Text><Pill label={nativeHomeType.replaceAll("_", " ").toUpperCase()} tone="dark" /></View><PrimaryButton disabled={nativeHomeSaving} label={nativeHomeSaving ? "Saving secure home…" : "Save home setup"} icon="checkmark" onPress={saveNativeHomeSetup} /></> : null}
             {homeStep < 2 ? <Press onPress={() => setHomeStep(homeStep + 1)} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>{homeStep === 0 ? "Enter address manually" : "Continue"}</Text></Press> : null}
           </View>
         </View>
@@ -711,6 +767,58 @@ export default function App() {
 
 function Timeline({ label, detail, active = false }: { label: string; detail: string; active?: boolean }) {
   return <View style={styles.timelineRow}><View style={[styles.timelineDot, active && styles.timelineDotActive]}>{active ? <AppIcon name="checkmark" size={11} color={C.white} /> : null}</View><View style={styles.timelineCopy}><Text style={[styles.timelineLabel, active && styles.timelineLabelActive]}>{label}</Text><Text style={styles.timelineDetail}>{detail}</Text></View></View>;
+}
+
+type NativeTechnicianOffer = { offer: { id: number; round: number; searchRadiusKm: number }; request: SyncedServiceRequest | null };
+
+function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () => void }) {
+  const [offers, setOffers] = useState<NativeTechnicianOffer[]>([]);
+  const [jobs, setJobs] = useState<SyncedServiceRequest[]>([]);
+  const [state, setState] = useState<"loading" | "ready" | "signin_required">("loading");
+  const [acceptingOfferId, setAcceptingOfferId] = useState<number | null>(null);
+
+  const refresh = async () => {
+    setState("loading");
+    try {
+      const [nextOffers, nextJobs] = await Promise.all([
+        (homeosApi as any).homeos.technician.offers.query() as Promise<NativeTechnicianOffer[]>,
+        (homeosApi as any).homeos.technician.jobs.query() as Promise<SyncedServiceRequest[]>,
+      ]);
+      setOffers(nextOffers);
+      setJobs(nextJobs);
+      setState("ready");
+    } catch {
+      setOffers([]);
+      setJobs([]);
+      setState("signin_required");
+    }
+  };
+
+  useEffect(() => { void refresh(); }, []);
+
+  const acceptOffer = async (offerId: number) => {
+    setAcceptingOfferId(offerId);
+    try {
+      await (homeosApi as any).homeos.technician.acceptOffer.mutate({ offerId });
+      await refresh();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Offer unavailable", "This protected offer may have already been accepted or expired. Refresh and try again.");
+    } finally {
+      setAcceptingOfferId(null);
+    }
+  };
+
+  const declineOffer = async (offerId: number) => {
+    try {
+      await (homeosApi as any).homeos.technician.declineOffer.mutate({ offerId, reason: "occupied" });
+      await refresh();
+    } catch {
+      Alert.alert("Decline unavailable", "HomeOS could not update this dispatch offer right now.");
+    }
+  };
+
+  return <SafeAreaView style={styles.app}><StatusBar style="dark" /><ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}><View style={styles.homeTopBar}><View><Text style={styles.eyebrow}>TECHNICIAN WORKSPACE</Text><Text style={styles.greeting}>Protected work queue</Text></View><Press onPress={onBackToCustomer} style={styles.avatar}><AppIcon name="swap-horizontal" size={20} color={C.forest} /></Press></View>{state === "loading" ? <View style={styles.panel}><Row icon="sync-outline" title="Loading technician records" detail="Checking protected offers and assigned jobs." /></View> : state === "signin_required" ? <View style={styles.panel}><Row icon="lock-closed-outline" title="Technician sign-in required" detail="Sign in with a verified technician account before accessing protected jobs and dispatch offers." /></View> : <><SectionTitle title="New dispatch offers" /><View style={styles.panel}>{offers.length ? offers.map((entry, index) => entry.request ? <View key={entry.offer.id}><Row icon="construct-outline" title={entry.request.category.replaceAll("_", " ")} detail={`${entry.request.publicId} · ${entry.request.urgency} priority · Round ${entry.offer.round} within ${entry.offer.searchRadiusKm} km`} />{index < offers.length - 1 ? <View style={styles.panelLine} /> : null}<View style={{ flexDirection: "row", gap: 10, padding: 15, paddingTop: 0 }}><Press onPress={() => void acceptOffer(entry.offer.id)} disabled={acceptingOfferId === entry.offer.id} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>{acceptingOfferId === entry.offer.id ? "Accepting…" : "Accept"}</Text></Press><Press onPress={() => void declineOffer(entry.offer.id)} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>Decline</Text></Press></View></View> : null) : <Row icon="briefcase-outline" title="No live offers" detail="Verified offers matching your availability and skills will appear here." />}</View><SectionTitle title="Assigned work" /><View style={styles.panel}>{jobs.length ? jobs.map((job, index) => <View key={job.id}><Row icon="clipboard-outline" title={job.category.replaceAll("_", " ")} detail={`${job.publicId} · ${job.status.replaceAll("_", " ")} · ${job.urgency} priority`} />{index < jobs.length - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="calendar-outline" title="No assigned jobs" detail="Accepted protected offers will appear here." />}</View><Press onPress={() => void refresh()} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Refresh protected work queue</Text></Press></>}</ScrollView></SafeAreaView>;
 }
 
 function TechnicianWorkspace({ onBackToCustomer, onOpenCustomerJob }: { onBackToCustomer: () => void; onOpenCustomerJob: () => void }) {

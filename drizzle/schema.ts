@@ -117,6 +117,17 @@ export const dispatchOffers = mysqlTable("dispatchOffers", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [index("dispatch_request_idx").on(table.serviceRequestId), index("dispatch_technician_idx").on(table.technicianId)]);
 
+export const dispatchRoundAudits = mysqlTable("dispatchRoundAudits", {
+  id: int("id").autoincrement().primaryKey(),
+  serviceRequestId: int("serviceRequestId").notNull(),
+  initiatedByUserId: int("initiatedByUserId").notNull(),
+  round: int("round").notNull(),
+  searchRadiusKm: int("searchRadiusKm").notNull(),
+  eligibleOfferCount: int("eligibleOfferCount").notNull().default(0),
+  outcome: mysqlEnum("outcome", ["offers_created", "exhausted"]).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [index("dispatch_round_audit_request_idx").on(table.serviceRequestId), index("dispatch_round_audit_created_idx").on(table.createdAt)]);
+
 export const quotes = mysqlTable("quotes", {
   id: int("id").autoincrement().primaryKey(),
   serviceRequestId: int("serviceRequestId").notNull(),

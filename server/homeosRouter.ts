@@ -6,6 +6,7 @@ import {
   accountProfiles,
   appliances,
   dispatchOffers,
+  dispatchRoundAudits,
   homes,
   invoices,
   jobProofs,
@@ -425,7 +426,7 @@ export const homeosRouter = router({
   dispatch: router({
     runRound: adminProcedure
       .input(z.object({ serviceRequestId: z.number().int().positive(), searchRadiusKm: z.number().int().min(1).max(25), limit: z.number().int().min(1).max(10).default(3) }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const db = await databaseOrThrow();
         const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, input.serviceRequestId)).limit(1);
         if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Service request not found." });
@@ -458,7 +459,16 @@ export const homeosRouter = router({
           await db.insert(dispatchOffers).values(offers.map((candidate) => ({ serviceRequestId: request.id, technicianId: candidate.technicianId, round, searchRadiusKm: input.searchRadiusKm, score: candidate.score.toFixed(2) })));
           await db.update(serviceRequests).set({ status: "matched" }).where(eq(serviceRequests.id, request.id));
         }
-        return { round, offers, exhausted: offers.length === 0 };
+        const exhausted = offers.length === 0;
+        await db.insert(dispatchRoundAudits).values({
+          serviceRequestId: request.id,
+          initiatedByUserId: ctx.user.id,
+          round,
+          searchRadiusKm: input.searchRadiusKm,
+          eligibleOfferCount: offers.length,
+          outcome: exhausted ? "exhausted" : "offers_created",
+        });
+        return { round, offers, exhausted };
       }),
     queue: adminProcedure.query(async () => {
       const db = await databaseOrThrow();
@@ -785,7 +795,27 @@ export const homeosRouter = router({
     }),
     dispatchQueue: adminProcedure.query(async () => {
       const db = await databaseOrThrow();
-      return db.select().from(serviceRequests).where(inArray(serviceRequests.status, ["submitted", "matched", "assigned"])).orderBy(desc(serviceRequests.createdAt));
+      const queue = await db.select().from(serviceRequests).where(inArray(serviceRequests.status, ["submitted", "matched", "assigned"])).orderBy(desc(serviceRequests.createdAt));
+      if (!queue.length) return [];
+      const audits = await db.select().from(dispatchRoundAudits).where(inArray(dispatchRoundAudits.serviceRequestId, queue.map((request) => request.id)));
+      const latestAuditByRequest = new Map<number, typeof audits[number]>();
+      for (const audit of audits) {
+        const current = latestAuditByRequest.get(audit.serviceRequestId);
+        if (!current || audit.id > current.id) latestAuditByRequest.set(audit.serviceRequestId, audit);
+      }
+      return queue.map((request) => {
+        const audit = latestAuditByRequest.get(request.id);
+        return {
+          ...request,
+          latestDispatchRound: audit ? {
+            round: audit.round,
+            searchRadiusKm: audit.searchRadiusKm,
+            eligibleOfferCount: audit.eligibleOfferCount,
+            outcome: audit.outcome,
+            createdAt: audit.createdAt,
+          } : null,
+        };
+      });
     }),
     technicians: adminProcedure.query(async () => {
       const db = await databaseOrThrow();

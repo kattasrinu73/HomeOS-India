@@ -7,6 +7,7 @@ const dbTestState = vi.hoisted(() => ({
   getDb: vi.fn(),
   selections: [] as unknown[][],
   updates: [] as Array<{ table: unknown; values: Record<string, unknown> }>,
+  inserts: [] as Array<{ table: unknown; values: unknown }>,
 }));
 
 vi.mock("./db", () => ({ getDb: dbTestState.getDb }));
@@ -21,7 +22,7 @@ function createAnonymousContext(): TrpcContext {
   };
 }
 
-function createAuthenticatedContext(userId = 101): TrpcContext {
+function createAuthenticatedContext(userId = 101, role: "user" | "admin" = "user"): TrpcContext {
   return {
     user: {
       id: userId,
@@ -29,7 +30,7 @@ function createAuthenticatedContext(userId = 101): TrpcContext {
       name: "HomeOS Test User",
       email: "test@example.com",
       loginMethod: "test",
-      role: "user",
+      role,
       createdAt: new Date("2026-08-24T00:00:00.000Z"),
       updatedAt: new Date("2026-08-24T00:00:00.000Z"),
       lastSignedIn: new Date("2026-08-24T00:00:00.000Z"),
@@ -40,27 +41,38 @@ function createAuthenticatedContext(userId = 101): TrpcContext {
 }
 
 function createMockDb() {
-  const select = vi.fn(() => ({
-    from: vi.fn(() => ({
-      where: vi.fn(() => ({
-        limit: vi.fn(async () => dbTestState.selections.shift() ?? []),
+  const select = vi.fn(() => {
+    const selectedRows = dbTestState.selections.shift() ?? [];
+    return {
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(async () => selectedRows),
+          orderBy: vi.fn(async () => selectedRows),
+          then: (resolve: (rows: unknown[]) => unknown, reject?: (error: unknown) => unknown) => Promise.resolve(selectedRows).then(resolve, reject),
+        })),
       })),
-    })),
-  }));
+    };
+  });
   const update = vi.fn((table: unknown) => ({
     set: vi.fn((values: Record<string, unknown>) => {
       dbTestState.updates.push({ table, values });
       return { where: vi.fn(async () => undefined) };
     }),
   }));
+  const insert = vi.fn((table: unknown) => ({
+    values: vi.fn(async (values: unknown) => {
+      dbTestState.inserts.push({ table, values });
+    }),
+  }));
 
-  return { select, update };
+  return { select, update, insert };
 }
 
 describe("HomeOS protected workflow transitions", () => {
   beforeEach(() => {
     dbTestState.selections.length = 0;
     dbTestState.updates.length = 0;
+    dbTestState.inserts.length = 0;
     dbTestState.getDb.mockReset();
     dbTestState.getDb.mockResolvedValue(createMockDb());
   });
@@ -161,5 +173,44 @@ describe("HomeOS protected workflow transitions", () => {
 
     await expect(homeosRouter.createCaller(createAuthenticatedContext()).requests.complete({ serviceRequestId: 19, completionOtp: "9999" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(dbTestState.updates).toHaveLength(0);
+  });
+
+  it("records an exhausted manual dispatch round for later operations review without auto-expanding the radius", async () => {
+    dbTestState.selections.push(
+      [{ id: 19, status: "submitted", homeId: 5, category: "plumbing" }],
+      [{ id: 5, latitude: "17.4400000", longitude: "78.3900000" }],
+      [],
+      [],
+      [],
+    );
+
+    const result = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).dispatch.runRound({ serviceRequestId: 19, searchRadiusKm: 5, limit: 3 });
+
+    expect(result).toMatchObject({ round: 1, offers: [], exhausted: true });
+    expect(dbTestState.inserts.map(({ values }) => values)).toEqual([expect.objectContaining({
+      serviceRequestId: 19,
+      initiatedByUserId: 101,
+      round: 1,
+      searchRadiusKm: 5,
+      eligibleOfferCount: 0,
+      outcome: "exhausted",
+    })]);
+  });
+
+  it("returns the latest persisted dispatch audit with each protected operations queue item", async () => {
+    dbTestState.selections.push(
+      [{ id: 19, publicId: "HOS-DISPATCH-1", status: "matched", category: "plumbing", urgency: "medium" }],
+      [
+        { id: 4, serviceRequestId: 19, round: 1, searchRadiusKm: 5, eligibleOfferCount: 0, outcome: "exhausted", createdAt: new Date("2026-08-24T08:00:00.000Z") },
+        { id: 5, serviceRequestId: 19, round: 2, searchRadiusKm: 10, eligibleOfferCount: 2, outcome: "offers_created", createdAt: new Date("2026-08-24T08:10:00.000Z") },
+      ],
+    );
+
+    const queue = await homeosRouter.createCaller(createAuthenticatedContext(101, "admin")).operations.dispatchQueue();
+
+    expect(queue).toEqual([expect.objectContaining({
+      id: 19,
+      latestDispatchRound: expect.objectContaining({ round: 2, searchRadiusKm: 10, eligibleOfferCount: 2, outcome: "offers_created" }),
+    })]);
   });
 });

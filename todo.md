@@ -87,3 +87,5 @@
 - [x] Show the native customer a protected, aggregate dispatch-handoff state that distinguishes an awaiting operator-controlled round from active verified offers without exposing technician data or fabricating an ETA.
 - [x] Render the same protected aggregate dispatch-handoff state in the web customer tracking view instead of a generic pending-technician placeholder.
 - [x] Add focused router-level caller tests that verify quote approval, quote-gated work start, and OTP-gated completion mutation behavior against a mocked database adapter.
+- [x] Show operations the persisted aggregate outcome of each manually launched dispatch round, including whether new eligible verified offers were created, without triggering automatic expansion.
+- [x] Add a protected operations query that derives persisted dispatch-round outcomes from stored offers and render the latest round, radius, and open/exhausted result for each queued request after refresh or navigation.

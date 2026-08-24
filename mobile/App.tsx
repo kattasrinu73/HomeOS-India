@@ -1104,6 +1104,8 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
   const [quoteParts, setQuoteParts] = useState("");
   const [quoteTaxes, setQuoteTaxes] = useState("");
   const [quoteSendingJobId, setQuoteSendingJobId] = useState<number | null>(null);
+  const [completionDraft, setCompletionDraft] = useState<{ jobId: number; value: string } | null>(null);
+  const [completingJobId, setCompletingJobId] = useState<number | null>(null);
 
   const refresh = async () => {
     setState("loading");
@@ -1239,6 +1241,25 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
     }
   };
 
+  const completeJobWithOtp = async (job: SyncedServiceRequest) => {
+    const completionOtp = completionDraft?.jobId === job.id ? completionDraft.value.trim() : "";
+    if (!/^\d{4,8}$/.test(completionOtp)) {
+      Alert.alert("Enter the customer OTP", "Enter the 4–8 digit completion code supplied by the customer after their inspection.");
+      return;
+    }
+    setCompletingJobId(job.id);
+    try {
+      await (homeosApi as any).homeos.requests.complete.mutate({ serviceRequestId: job.id, completionOtp });
+      setCompletionDraft(null);
+      await refresh();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Completion unavailable", "HomeOS could not complete this protected job. Confirm that the assigned customer provided the current OTP and try again.");
+    } finally {
+      setCompletingJobId(null);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.app}>
       <StatusBar style="dark" />
@@ -1268,7 +1289,7 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
                 <View style={{ marginTop: 12 }}><PrimaryButton disabled={quoteSendingJobId === job.id} label={quoteSendingJobId === job.id ? "Sending protected quote…" : "Send itemised quote"} icon="send-outline" onPress={() => void sendQuote(job)} /></View>
                 <Press onPress={() => setQuoteDraftJobId(null)} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Cancel</Text></Press>
               </View> : <Press onPress={() => setQuoteDraftJobId(job.id)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{job.status === "quote_pending" ? "Revise itemised quote" : "Create itemised quote"}</Text><AppIcon name="receipt-outline" size={18} /></Press>}
-            </View> : job.status === "quote_approved" ? <View style={{ padding: 15, paddingTop: 0 }}><Press onPress={() => void progressJob(job, "start")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Starting…" : "Start approved work"}</Text><AppIcon name="play-outline" size={18} /></Press></View> : job.status === "in_progress" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Press onPress={() => void addAfterWorkProof(job)} disabled={proofUploadingId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{proofUploadingId === job.id ? "Uploading proof…" : "Add after-work proof"}</Text><AppIcon name="camera-outline" size={18} /></Press><Press onPress={() => void progressJob(job, "completion_ready")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Updating…" : "Request completion OTP"}</Text><AppIcon name="key-outline" size={18} /></Press></View> : job.status === "completion_pending" ? <View style={{ padding: 15, paddingTop: 0 }}><Text style={styles.rowDetail}>Awaiting the customer’s OTP-gated completion confirmation.</Text></View> : null}
+            </View> : job.status === "quote_approved" ? <View style={{ padding: 15, paddingTop: 0 }}><Press onPress={() => void progressJob(job, "start")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Starting…" : "Start approved work"}</Text><AppIcon name="play-outline" size={18} /></Press></View> : job.status === "in_progress" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Press onPress={() => void addAfterWorkProof(job)} disabled={proofUploadingId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{proofUploadingId === job.id ? "Uploading proof…" : "Add after-work proof"}</Text><AppIcon name="camera-outline" size={18} /></Press><Press onPress={() => void progressJob(job, "completion_ready")} disabled={jobActionId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{jobActionId === job.id ? "Updating…" : "Request completion OTP"}</Text><AppIcon name="key-outline" size={18} /></Press></View> : job.status === "completion_pending" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Text style={styles.rowDetail}>After the customer inspects the work, enter their OTP here. Only this assigned technician action can complete the job.</Text><TextInput value={completionDraft?.jobId === job.id ? completionDraft.value : ""} onChangeText={(value) => setCompletionDraft({ jobId: job.id, value: value.replace(/\D/g, "").slice(0, 8) })} placeholder="Customer completion OTP" placeholderTextColor="#98958D" keyboardType="number-pad" maxLength={8} style={[styles.textArea, { minHeight: 42, paddingVertical: 0 }]} /><Press onPress={() => void completeJobWithOtp(job)} disabled={completingJobId === job.id} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{completingJobId === job.id ? "Completing securely…" : "Submit protected completion"}</Text><AppIcon name="checkmark-done-outline" size={18} /></Press></View> : null}
             {index < jobs.length - 1 ? <View style={styles.panelLine} /> : null}
           </View>) : <Row icon="calendar-outline" title="No assigned jobs" detail="Accepted protected offers will appear here." />}</View>
           <Press onPress={() => void refresh()} style={styles.textOnlyButton}><Text style={styles.textOnlyButtonText}>Refresh protected work queue</Text></Press>

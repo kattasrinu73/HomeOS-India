@@ -35,6 +35,7 @@ import {
   rankDispatchCandidates,
   canTechnicianAdvanceJob,
   technicianProgressTransitions,
+  buildTechnicianPerformanceSummary,
 } from "./homeosWorkflow";
 
 const categories = ["electrical", "plumbing", "ac_appliances", "carpentry", "cleaning", "ro", "painting", "other"] as const;
@@ -435,6 +436,15 @@ export const homeosRouter = router({
     }),
   }),
   technician: router({
+    summary: protectedProcedure.query(async ({ ctx }) => {
+      const db = await databaseOrThrow();
+      const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+      if (!technician) throw new TRPCError({ code: "FORBIDDEN", message: "Technician profile required." });
+      const assignedJobs = await db.select().from(serviceRequests).where(eq(serviceRequests.assignedTechnicianId, technician.id));
+      const jobIds = assignedJobs.map((job) => job.id);
+      const confirmedPayments = jobIds.length ? await db.select({ total: payments.total }).from(payments).where(and(inArray(payments.serviceRequestId, jobIds), eq(payments.status, "confirmed"))) : [];
+      return buildTechnicianPerformanceSummary({ assignedJobStatuses: assignedJobs.map((job) => job.status), confirmedPaymentTotals: confirmedPayments.map((payment) => payment.total) });
+    }),
     offers: protectedProcedure.query(async ({ ctx }) => {
       const db = await databaseOrThrow();
       const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);

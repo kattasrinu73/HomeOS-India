@@ -76,3 +76,5 @@
 - [x] Persist the native customer-versus-technician mode selection through the protected account-intent contract instead of using only local role state.
 - [x] Render native customer tracking milestones from the selected protected request status instead of a static service timeline.
 - [x] Remove the obsolete unrendered local technician demo so only the protected NativeTechnicianWorkspace remains in the Android client.
+- [x] Show an authenticated technician a protected persisted performance summary based only on assigned completed jobs and confirmed payment records.
+- [x] Derive every visible native technician summary metric from assigned job records and confirmed payments, with focused aggregation coverage.

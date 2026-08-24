@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildInvoicePayload,
   buildInvoiceMetadata,
+  buildTechnicianPerformanceSummary,
   canStartWork,
   canTechnicianAdvanceJob,
   hashCompletionOtp,
@@ -45,6 +46,21 @@ describe("HomeOS service workflow", () => {
     expect(canTechnicianAdvanceJob("assigned", "arrived")).toBe(false);
     expect(canTechnicianAdvanceJob("arrived", "en_route")).toBe(false);
     expect(canTechnicianAdvanceJob("diagnosing", "arrived")).toBe(false);
+  });
+
+  it("summarises technician performance only from assigned job status and confirmed payment totals", () => {
+    expect(buildTechnicianPerformanceSummary({ assignedJobStatuses: ["assigned", "completed", "paid", "cancelled"], confirmedPaymentTotals: [749, 1200] })).toEqual({
+      completedJobCount: 2,
+      activeJobCount: 1,
+      confirmedPaymentCount: 2,
+      confirmedCustomerPaymentTotal: 1949,
+    });
+    expect(buildTechnicianPerformanceSummary({ assignedJobStatuses: [], confirmedPaymentTotals: [] })).toEqual({
+      completedJobCount: 0,
+      activeJobCount: 0,
+      confirmedPaymentCount: 0,
+      confirmedCustomerPaymentTotal: 0,
+    });
   });
 
   it("validates the completion OTP without storing it in plain text", () => {

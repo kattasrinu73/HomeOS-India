@@ -34,6 +34,17 @@ export function canTechnicianAdvanceJob(currentStatus: ServiceJobStatus, nextSta
   return currentStatus === technicianProgressTransitions[nextStatus];
 }
 
+export function buildTechnicianPerformanceSummary(input: { assignedJobStatuses: ServiceJobStatus[]; confirmedPaymentTotals: number[] }) {
+  const completedJobCount = input.assignedJobStatuses.filter((status) => status === "completed" || status === "paid").length;
+  const activeJobCount = input.assignedJobStatuses.filter((status) => !["completed", "paid", "cancelled"].includes(status)).length;
+  return {
+    completedJobCount,
+    activeJobCount,
+    confirmedPaymentCount: input.confirmedPaymentTotals.length,
+    confirmedCustomerPaymentTotal: input.confirmedPaymentTotals.reduce((total, paymentTotal) => total + paymentTotal, 0),
+  };
+}
+
 export function scoreCandidate(candidate: DispatchCandidate): number {
   if (!candidate.available || !candidate.verifiedSkill) return Number.NEGATIVE_INFINITY;
   const distanceScore = Math.max(0, 100 - candidate.distanceKm * 12);

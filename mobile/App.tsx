@@ -980,10 +980,12 @@ function Timeline({ label, detail, active = false }: { label: string; detail: st
 }
 
 type NativeTechnicianOffer = { offer: { id: number; round: number; searchRadiusKm: number }; request: SyncedServiceRequest | null };
+type NativeTechnicianSummary = { completedJobCount: number; activeJobCount: number; confirmedPaymentCount: number; confirmedCustomerPaymentTotal: number };
 
 function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () => void }) {
   const [offers, setOffers] = useState<NativeTechnicianOffer[]>([]);
   const [jobs, setJobs] = useState<SyncedServiceRequest[]>([]);
+  const [summary, setSummary] = useState<NativeTechnicianSummary | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "signin_required">("loading");
   const [acceptingOfferId, setAcceptingOfferId] = useState<number | null>(null);
   const [jobActionId, setJobActionId] = useState<number | null>(null);
@@ -999,16 +1001,19 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
   const refresh = async () => {
     setState("loading");
     try {
-      const [nextOffers, nextJobs] = await Promise.all([
+      const [nextOffers, nextJobs, nextSummary] = await Promise.all([
         (homeosApi as any).homeos.technician.offers.query() as Promise<NativeTechnicianOffer[]>,
         (homeosApi as any).homeos.technician.jobs.query() as Promise<SyncedServiceRequest[]>,
+        (homeosApi as any).homeos.technician.summary.query() as Promise<NativeTechnicianSummary>,
       ]);
       setOffers(nextOffers);
       setJobs(nextJobs);
+      setSummary(nextSummary);
       setState("ready");
     } catch {
       setOffers([]);
       setJobs([]);
+      setSummary(null);
       setState("signin_required");
     }
   };
@@ -1136,6 +1141,8 @@ function NativeTechnicianWorkspace({ onBackToCustomer }: { onBackToCustomer: () 
           <Press onPress={onBackToCustomer} style={styles.avatar}><AppIcon name="swap-horizontal" size={20} color={C.forest} /></Press>
         </View>
         {state === "loading" ? <View style={styles.panel}><Row icon="sync-outline" title="Loading technician records" detail="Checking protected offers and assigned jobs." /></View> : state === "signin_required" ? <View style={styles.panel}><Row icon="lock-closed-outline" title="Technician sign-in required" detail="Sign in with a verified technician account before accessing protected jobs and dispatch offers." /></View> : <>
+          <SectionTitle title="Your protected performance" />
+          <View style={styles.panel}><Row icon="checkmark-done-outline" title={`${summary?.completedJobCount ?? 0} completed jobs`} detail={`${summary?.activeJobCount ?? 0} active assigned jobs`} /><View style={styles.panelLine} /><Row icon="wallet-outline" title={`${formatIndianRupees(summary?.confirmedCustomerPaymentTotal ?? 0)} confirmed customer payments`} detail={`${summary?.confirmedPaymentCount ?? 0} provider-confirmed payment records`} /></View>
           <SectionTitle title="New dispatch offers" />
           <View style={styles.panel}>{offers.length ? offers.map((entry, index) => entry.request ? <View key={entry.offer.id}><Row icon="construct-outline" title={entry.request.category.replaceAll("_", " ")} detail={`${entry.request.publicId} · ${entry.request.urgency} priority · Round ${entry.offer.round} within ${entry.offer.searchRadiusKm} km`} />{index < offers.length - 1 ? <View style={styles.panelLine} /> : null}<View style={{ flexDirection: "row", gap: 10, padding: 15, paddingTop: 0 }}><Press onPress={() => void acceptOffer(entry.offer.id)} disabled={acceptingOfferId === entry.offer.id} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>{acceptingOfferId === entry.offer.id ? "Accepting…" : "Accept"}</Text></Press><Press onPress={() => void declineOffer(entry.offer.id)} style={[styles.secondaryButton, { flex: 1 }]}><Text style={styles.secondaryButtonText}>Decline</Text></Press></View></View> : null) : <Row icon="briefcase-outline" title="No live offers" detail="Verified offers matching your availability and skills will appear here." />}</View>
           <SectionTitle title="Assigned work" />

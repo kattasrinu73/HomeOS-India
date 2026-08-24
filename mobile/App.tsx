@@ -5,7 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
   Image,
@@ -26,6 +26,7 @@ import {
   warrantyEndsOn,
   type JobStatus,
 } from "./src/workflow";
+import { homeosApi, homeosApiConfigured } from "./src/homeosApi";
 
 const C = {
   ink: "#14251F",
@@ -57,6 +58,14 @@ type CustomerScreen =
   | "passport"
   | "jobs"
   | "account";
+
+type SyncedHome = {
+  id: number;
+  label: string;
+  locality: string;
+  city: string;
+  healthScore: number;
+};
 
 const statusCopy: Record<JobStatus, string> = {
   submitted: "Request received",
@@ -193,6 +202,8 @@ export default function App() {
   const [paymentMethod, setPaymentMethod] = useState("UPI");
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [homeStep, setHomeStep] = useState(0);
+  const [syncedHome, setSyncedHome] = useState<SyncedHome | null>(null);
+  const [nativeSyncStatus, setNativeSyncStatus] = useState<"loading" | "ready" | "signin_required" | "unavailable">("loading");
 
   const warrantyEnd = useMemo(() => warrantyEndsOn(new Date()), []);
   const invoiceLines = [
@@ -202,6 +213,26 @@ export default function App() {
     ["Taxes", 0],
   ] as const;
   const invoiceTotal = invoiceLines.reduce((total, [, amount]) => total + amount, 0);
+
+  const refreshNativeHome = async () => {
+    if (!homeosApiConfigured()) {
+      setNativeSyncStatus("unavailable");
+      return;
+    }
+    setNativeSyncStatus("loading");
+    try {
+      const homes = await (homeosApi as any).homeos.homes.list.query() as SyncedHome[];
+      setSyncedHome(homes[0] ?? null);
+      setNativeSyncStatus("ready");
+    } catch {
+      setSyncedHome(null);
+      setNativeSyncStatus("signin_required");
+    }
+  };
+
+  useEffect(() => {
+    void refreshNativeHome();
+  }, []);
 
   const changeTab = (nextTab: CustomerTab) => {
     setTab(nextTab);
@@ -310,7 +341,7 @@ export default function App() {
           </View>
           <Press onPress={useLocation} style={styles.locationLine}>
             <AppIcon name="location-sharp" size={16} color={C.coral} />
-            <Text style={styles.locationText}>{locationLabel}</Text>
+            <Text style={styles.locationText}>{syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : nativeSyncStatus === "loading" ? "Loading saved home…" : locationLabel}</Text>
             <AppIcon name="chevron-down" size={15} color={C.muted} />
           </Press>
 
@@ -326,8 +357,8 @@ export default function App() {
           </LinearGradient>
 
           <View style={styles.homeHealth}>
-            <View style={styles.healthOrb}><Text style={styles.healthNumber}>82</Text><Text style={styles.healthSuffix}>/100</Text></View>
-            <View style={styles.healthCopy}><Text style={styles.healthLabel}>Home Health</Text><Text style={styles.healthDetail}>One maintenance item is due this month.</Text></View>
+            <View style={styles.healthOrb}><Text style={styles.healthNumber}>{syncedHome?.healthScore ?? "—"}</Text><Text style={styles.healthSuffix}>/100</Text></View>
+            <View style={styles.healthCopy}><Text style={styles.healthLabel}>Home Health</Text><Text style={styles.healthDetail}>{syncedHome ? `Saved for ${syncedHome.label}` : nativeSyncStatus === "signin_required" ? "Sign in to synchronise your home health." : "A saved HomeOS home will show its score here."}</Text></View>
             <Press onPress={() => setScreen("passport")} style={styles.roundLink}><AppIcon name="arrow-forward" size={18} /></Press>
           </View>
 
@@ -354,9 +385,9 @@ export default function App() {
 
           <SectionTitle title="Your home" />
           <View style={styles.panel}>
-            <Row icon="calendar-outline" title="Maintenance due" detail="AC service is due this month" onPress={() => startFix("AC & appliances")} />
+            <Row icon="calendar-outline" title="Maintenance reminders" detail="No synchronised reminders yet. Saved appliance maintenance will appear after account sync." onPress={() => startFix("AC & appliances")} />
             <View style={styles.panelLine} />
-            <Row icon="shield-checkmark-outline" title="Active warranties" detail="2 services are currently protected" onPress={() => setScreen("passport")} />
+            <Row icon="shield-checkmark-outline" title="Active warranties" detail="No synchronised warranty record yet." onPress={() => setScreen("passport")} />
           </View>
           <View style={styles.safetyNote}><AppIcon name="information-circle-outline" size={18} color={C.moss} /><Text style={styles.safetyText}>For sparks, gas smells, or a major leak, use Emergency help and follow the safety guidance first.</Text></View>
         </ScrollView>
@@ -412,15 +443,12 @@ export default function App() {
     if (screen === "matches") {
       return (
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
-          <ScreenHeader title="Choose your match" onBack={() => setScreen("analysis")} />
-          <Text style={styles.flowTitle}>Qualified help, on your terms.</Text>
-          <Text style={styles.flowSubtitle}>Only eligible professionals are considered. Availability and service-fit are verified before a job is offered.</Text>
-          <View style={styles.modeRail}>
-            <Pill label="Fastest" tone="dark" /><Pill label="Best-rated" /><Pill label="Lowest-cost" /><Pill label="Preferred" />
-          </View>
-          <View style={[styles.matchCard, styles.matchCardSelected]}><View style={styles.matchTop}><View style={styles.techAvatar}><Text style={styles.techInitials}>RK</Text></View><View style={styles.matchName}><Text style={styles.matchPerson}>Ramesh Kumar</Text><Text style={styles.matchSpecialty}>Verified AC & appliance specialist</Text></View><Pill label="FASTEST" tone="warm" /></View><View style={styles.matchStats}><View><Text style={styles.metaLabel}>ARRIVAL</Text><Text style={styles.matchMetric}>About 12 min</Text></View><View><Text style={styles.metaLabel}>ESTIMATE</Text><Text style={styles.matchMetric}>{formatIndianRupees(199)}–{formatIndianRupees(1200)}</Text></View><View><Text style={styles.metaLabel}>MATCH</Text><Text style={styles.matchMetric}>AC cooling</Text></View></View><Text style={styles.matchFoot}>Service evidence, itemised quote approval, and a 30-day service warranty are included.</Text><PrimaryButton label="Choose Ramesh" icon="arrow-forward" onPress={selectTechnician} /></View>
-          <View style={styles.matchCard}><View style={styles.matchTop}><View style={[styles.techAvatar, { backgroundColor: C.sage }]}><Text style={styles.techInitials}>AK</Text></View><View style={styles.matchName}><Text style={styles.matchPerson}>Asha Khan</Text><Text style={styles.matchSpecialty}>Verified appliance specialist</Text></View><Pill label="AVAILABLE" tone="success" /></View><Text style={styles.matchFoot}>Select the match to review current availability, coverage, and price estimate.</Text><Press onPress={selectTechnician} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Review match</Text><AppIcon name="arrow-forward" size={18} /></Press></View>
-          <Text style={styles.disclaimer}>Ranking options use live professional performance data once the dispatch service is connected. This build does not invent customer ratings or reviews.</Text>
+          <ScreenHeader title="Find a qualified professional" onBack={() => setScreen("analysis")} />
+          <Text style={styles.flowTitle}>Controlled verified matching.</Text>
+          <Text style={styles.flowSubtitle}>The signed-in HomeOS service creates a request, then dispatches real eligible professionals by verified skill, availability, distance, and reliability.</Text>
+          <View style={[styles.matchCard, styles.matchCardSelected]}><View style={styles.matchTop}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={24} color={C.white} /></View><View style={styles.matchName}><Text style={styles.matchPerson}>Awaiting secure dispatch</Text><Text style={styles.matchSpecialty}>No technician, rating, availability, or ETA is shown until it is returned by the protected matching service.</Text></View></View><Text style={styles.matchFoot}>The Android client needs an authenticated backend transport before it can create this request and display the real accepted technician.</Text></View>
+          <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Use the signed-in HomeOS web app to submit a live request while native account synchronisation is being completed.</Text></View>
+          <PrimaryButton label="Return to issue details" icon="chevron-back" onPress={() => setScreen("fix")} />
         </ScrollView>
       );
     }
@@ -507,11 +535,11 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Home Service Passport" action={<AppIcon name="ellipsis-horizontal" size={20} />} />
           <View style={styles.passportHero}><View><Text style={styles.passportEyebrow}>YOUR HOME RECORD</Text><Text style={styles.passportTitle}>Everything remembered.</Text><Text style={styles.passportBody}>Service, proof, invoices, and warranty protection in one secure history.</Text></View><View style={styles.passportSeal}><AppIcon name="shield-checkmark" size={27} color={C.white} /></View></View>
-          <View style={styles.passportScore}><Text style={styles.metaLabel}>HOME HEALTH SCORE</Text><Text style={styles.passportScoreNumber}>82 <Text style={styles.healthSuffix}>/ 100</Text></Text><Text style={styles.passportScoreDetail}>Keep appliances maintained and warranty coverage active to improve your score.</Text></View>
+          <View style={styles.passportScore}><Text style={styles.metaLabel}>HOME HEALTH SCORE</Text><Text style={styles.passportScoreNumber}>— <Text style={styles.healthSuffix}>/ 100</Text></Text><Text style={styles.passportScoreDetail}>Your score will appear after the signed-in app synchronises your saved home and service records.</Text></View>
           <SectionTitle title="Service history" />
-          <View style={styles.panel}><Row icon="snow-outline" title="AC cooling check" detail="Today · Ramesh Kumar" action={<Pill label="30-DAY WARRANTY" tone="success" />} /><View style={styles.panelLine} /><Row icon="snow-outline" title="AC general service" detail="Service history retained securely" action={<AppIcon name="chevron-forward" size={18} color={C.muted} />} /></View>
+          <View style={styles.panel}><Row icon="document-text-outline" title="No synchronised service history yet" detail="Signed-in web service records, proof, invoices, and active warranties will appear here after native backend transport is enabled." /></View>
           <SectionTitle title="Your appliances" />
-          <View style={styles.applianceCard}><View style={styles.applianceIcon}><AppIcon name="snow-outline" size={25} /></View><View style={styles.applianceCopy}><Text style={styles.rowTitle}>Air conditioner</Text><Text style={styles.rowDetail}>Add brand, model, and invoice in home setup</Text></View><Press onPress={() => setOnboardingVisible(true)} style={styles.roundLink}><AppIcon name="add" size={19} /></Press></View>
+          <View style={styles.applianceCard}><View style={styles.applianceIcon}><AppIcon name="home-outline" size={25} /></View><View style={styles.applianceCopy}><Text style={styles.rowTitle}>No appliances synchronised</Text><Text style={styles.rowDetail}>Save appliance details in your signed-in HomeOS account to build this record.</Text></View><Press onPress={() => setOnboardingVisible(true)} style={styles.roundLink}><AppIcon name="add" size={19} /></Press></View>
         </ScrollView>
       );
     }

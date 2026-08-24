@@ -4,17 +4,22 @@
   "main": "index.ts",
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
+    "@trpc/client": "11.7.2",
     "expo": "~57.0.15",
     "expo-blur": "~57.0.2",
     "expo-haptics": "~57.0.1",
     "expo-image-picker": "~57.0.12",
     "expo-linear-gradient": "~57.0.1",
+    "expo-linking": "^57.0.7",
     "expo-location": "~57.0.12",
+    "expo-secure-store": "^57.0.1",
     "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "^57.0.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
-    "react-native-web": "^0.21.2"
+    "react-native-web": "^0.21.2",
+    "superjson": "^2.2.6"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

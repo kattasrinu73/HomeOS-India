@@ -96,3 +96,4 @@
 - [x] Show accepted Passport document types and the 10 MB protected upload limit before native file selection, while retaining picker and server validation.
 - [x] Record the latest successful internal Android APK containing provider-gated billing cleanup, server-status-only OTP guidance, and Passport upload constraints.
 - [x] Add assigned-technician OTP submission in the native app through the protected completion endpoint, with validation, error feedback, and a refreshed completed job state.
+- [x] Record the successful refreshed internal Android APK containing the assigned-technician protected OTP completion action.

@@ -199,7 +199,8 @@ export const homeosRouter = router({
       const db = await databaseOrThrow();
       const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
       const [profile] = await db.select().from(accountProfiles).where(eq(accountProfiles.userId, ctx.user.id)).limit(1);
-      return { user: ctx.user, technician: technician ?? null, profile: profile ?? null };
+      const skills = technician ? await db.select().from(technicianSkills).where(eq(technicianSkills.technicianId, technician.id)).orderBy(desc(technicianSkills.createdAt)) : [];
+      return { user: ctx.user, technician: technician ?? null, profile: profile ?? null, skills };
     }),
     setServiceIntent: protectedProcedure
       .input(z.object({ serviceIntent: z.enum(["customer", "technician"]) }))
@@ -220,6 +221,20 @@ export const homeosRouter = router({
         await db.insert(technicians).values({ userId: ctx.user.id, displayName: input.displayName, verificationStatus: "pending", availability: "offline", serviceRadiusKm: 5, completionRate: "0", onTimeRate: "0" });
         const [created] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
         if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create technician profile." });
+        return created;
+      }),
+    declareSkill: protectedProcedure
+      .input(z.object({ category: z.enum(categories) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+        if (!technician) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Create a technician profile before declaring service skills." });
+        const category = asHomeCategory(input.category);
+        const [existing] = await db.select().from(technicianSkills).where(and(eq(technicianSkills.technicianId, technician.id), eq(technicianSkills.category, category))).limit(1);
+        if (existing) return existing;
+        await db.insert(technicianSkills).values({ technicianId: technician.id, category, verified: false });
+        const [created] = await db.select().from(technicianSkills).where(and(eq(technicianSkills.technicianId, technician.id), eq(technicianSkills.category, category))).limit(1);
+        if (!created) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save technician skill." });
         return created;
       }),
     setAvailability: protectedProcedure
@@ -773,6 +788,15 @@ export const homeosRouter = router({
       const db = await databaseOrThrow();
       return db.select({ id: technicians.id, displayName: technicians.displayName, verificationStatus: technicians.verificationStatus, availability: technicians.availability, serviceRadiusKm: technicians.serviceRadiusKm, locationUpdatedAt: technicians.locationUpdatedAt, createdAt: technicians.createdAt }).from(technicians).orderBy(desc(technicians.createdAt));
     }),
+    technicianSkills: adminProcedure.query(async () => {
+      const db = await databaseOrThrow();
+      const [skills, technicianRows] = await Promise.all([
+        db.select().from(technicianSkills).orderBy(desc(technicianSkills.createdAt)),
+        db.select({ id: technicians.id, displayName: technicians.displayName, verificationStatus: technicians.verificationStatus }).from(technicians),
+      ]);
+      const technicianById = new Map(technicianRows.map((technician) => [technician.id, technician]));
+      return skills.map((skill) => ({ ...skill, technician: technicianById.get(skill.technicianId) ?? null }));
+    }),
     setTechnicianVerification: adminProcedure
       .input(z.object({ technicianId: z.number().int().positive(), verificationStatus: z.enum(["verified", "suspended"]) }))
       .mutation(async ({ input }) => {
@@ -781,6 +805,15 @@ export const homeosRouter = router({
         if (!technician) throw new TRPCError({ code: "NOT_FOUND", message: "Technician profile not found." });
         await db.update(technicians).set({ verificationStatus: input.verificationStatus, ...(input.verificationStatus === "suspended" ? { availability: "offline" as const } : {}) }).where(eq(technicians.id, technician.id));
         return { success: true, technicianId: technician.id, verificationStatus: input.verificationStatus };
+      }),
+    setTechnicianSkillVerification: adminProcedure
+      .input(z.object({ technicianSkillId: z.number().int().positive(), verified: z.boolean() }))
+      .mutation(async ({ input }) => {
+        const db = await databaseOrThrow();
+        const [skill] = await db.select().from(technicianSkills).where(eq(technicianSkills.id, input.technicianSkillId)).limit(1);
+        if (!skill) throw new TRPCError({ code: "NOT_FOUND", message: "Technician skill record not found." });
+        await db.update(technicianSkills).set({ verified: input.verified }).where(eq(technicianSkills.id, skill.id));
+        return { success: true, technicianSkillId: skill.id, verified: input.verified };
       }),
   }),
   notifications: router({

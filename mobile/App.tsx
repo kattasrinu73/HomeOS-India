@@ -114,10 +114,25 @@ type SyncedNotification = {
   createdAt: Date | string;
 };
 
+type NativeTechnicianSkill = { id: number; category: string; verified: boolean };
+type NativeSkillCategory = "electrical" | "plumbing" | "ac_appliances" | "carpentry" | "cleaning" | "ro" | "painting" | "other";
+
+const technicianSkillOptions: Array<{ api: NativeSkillCategory; label: string }> = [
+  { api: "electrical", label: "Electrical" },
+  { api: "plumbing", label: "Plumbing" },
+  { api: "ac_appliances", label: "AC & appliances" },
+  { api: "carpentry", label: "Carpentry" },
+  { api: "cleaning", label: "Cleaning" },
+  { api: "ro", label: "RO service" },
+  { api: "painting", label: "Painting" },
+  { api: "other", label: "Other" },
+];
+
 type NativeAccountProfile = {
   user: { name?: string | null } | null;
   profile: { serviceIntent: "customer" | "technician" } | null;
   technician: { id: number; displayName: string; verificationStatus: "pending" | "verified" | "suspended"; availability: "offline" | "available" | "busy" } | null;
+  skills: NativeTechnicianSkill[];
 };
 
 type NativeRequestDetail = {
@@ -287,6 +302,7 @@ export default function App() {
   const [nativeAccountIntent, setNativeAccountIntent] = useState<"customer" | "technician" | null>(null);
   const [nativeAccountName, setNativeAccountName] = useState<string | null>(null);
   const [nativeTechnician, setNativeTechnician] = useState<NativeAccountProfile["technician"]>(null);
+  const [nativeTechnicianSkills, setNativeTechnicianSkills] = useState<NativeTechnicianSkill[]>([]);
   const [technicianApplicationName, setTechnicianApplicationName] = useState("");
   const [nativeTechnicianActionLoading, setNativeTechnicianActionLoading] = useState(false);
   const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
@@ -334,6 +350,7 @@ export default function App() {
       setNativeAccountIntent(account.profile?.serviceIntent ?? null);
       setNativeAccountName(account.user?.name?.trim() || null);
       setNativeTechnician(account.technician);
+      setNativeTechnicianSkills(account.skills);
       if (!technicianApplicationName.trim() && account.user?.name?.trim()) setTechnicianApplicationName(account.user.name.trim());
       if (account.profile?.serviceIntent) setRole(account.profile.serviceIntent);
       const [documents, applianceRecords, passportHistory] = homes[0]
@@ -364,6 +381,7 @@ export default function App() {
       setNativeAccountIntent(null);
       setNativeAccountName(null);
       setNativeTechnician(null);
+      setNativeTechnicianSkills([]);
       setTechnicianApplicationName("");
       setSyncedRequestDetail(null);
       setNativeSyncStatus("signin_required");
@@ -537,6 +555,7 @@ export default function App() {
     setNativeAccountIntent(null);
     setNativeAccountName(null);
     setNativeTechnician(null);
+    setNativeTechnicianSkills([]);
     setTechnicianApplicationName("");
     setSyncedRequestDetail(null);
     setRole("customer");
@@ -586,6 +605,23 @@ export default function App() {
       setNativeTechnician({ ...nativeTechnician, availability });
     } catch {
       Alert.alert("Availability unavailable", "HomeOS could not save your protected availability right now. Please try again.");
+    } finally {
+      setNativeTechnicianActionLoading(false);
+    }
+  };
+
+  const declareNativeTechnicianSkill = async (category: NativeSkillCategory) => {
+    if (!nativeTechnician) {
+      Alert.alert("Technician profile required", "Create a protected technician profile before declaring service skills.");
+      return;
+    }
+    setNativeTechnicianActionLoading(true);
+    try {
+      await (homeosApi as any).homeos.account.declareSkill.mutate({ category });
+      await refreshNativeHome();
+      Alert.alert("Skill submitted", "HomeOS saved this skill as pending. Operations must verify it before it can be used for dispatch.");
+    } catch {
+      Alert.alert("Skill unavailable", "HomeOS could not save this protected skill right now. Please try again.");
     } finally {
       setNativeTechnicianActionLoading(false);
     }
@@ -1019,6 +1055,7 @@ export default function App() {
         <Press onPress={() => void updateNativeRole("technician")} style={styles.modeSwitch}><View style={styles.modeSwitchIcon}><AppIcon name="construct-outline" size={23} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>Open technician workspace</Text><Text style={styles.rowDetail}>{nativeAccountIntent === "technician" ? "Saved technician workspace preference." : "Review and manage service opportunities."}</Text></View><AppIcon name="arrow-forward" size={18} /></Press>
         <SectionTitle title="Technician profile" />
         {nativeTechnician ? <View style={styles.panel}><Row icon="shield-checkmark-outline" title={nativeTechnician.displayName} detail={`Verification: ${nativeTechnician.verificationStatus} · Availability: ${nativeTechnician.availability}`} />{nativeTechnician.verificationStatus === "verified" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Press disabled={nativeTechnicianActionLoading} onPress={() => void setNativeTechnicianAvailability(nativeTechnician.availability === "available" ? "offline" : "available")} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeTechnicianActionLoading ? "Saving availability…" : nativeTechnician.availability === "available" ? "Set unavailable" : "Set available for dispatch"}</Text><AppIcon name={nativeTechnician.availability === "available" ? "pause-outline" : "radio-outline"} size={18} /></Press><Press disabled={nativeTechnicianActionLoading} onPress={() => void setNativeTechnicianAvailability("busy")} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Set busy</Text><AppIcon name="time-outline" size={18} /></Press><Press disabled={nativeTechnicianActionLoading} onPress={() => void shareNativeTechnicianLocation()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeTechnicianActionLoading ? "Updating dispatch location…" : "Share current dispatch location"}</Text><AppIcon name="navigate-outline" size={18} /></Press></View> : <View style={{ padding: 15, paddingTop: 0 }}><Text style={styles.rowDetail}>{nativeTechnician.verificationStatus === "pending" ? "Verification is pending. Dispatch offers and availability remain unavailable until HomeOS verifies this profile." : "This profile is not currently eligible for dispatch. Contact HomeOS support for verification review."}</Text></View>}</View> : <View style={styles.inputPanel}><Text style={styles.inputLabel}>Professional display name</Text><TextInput value={technicianApplicationName} onChangeText={setTechnicianApplicationName} placeholder="Your technician business name" placeholderTextColor="#98958D" style={[styles.textArea, { minHeight: 42, paddingVertical: 0 }]} /><View style={{ marginTop: 12 }}><PrimaryButton disabled={nativeTechnicianActionLoading || nativeSyncStatus !== "ready"} label={nativeTechnicianActionLoading ? "Submitting profile…" : "Apply as a technician"} icon="construct-outline" onPress={applyForTechnicianProfile} /></View><Text style={styles.rowDetail}>New profiles are saved as pending and cannot receive dispatch offers until HomeOS verifies them.</Text></View>}
+        {nativeTechnician ? <><SectionTitle title="Service skills" /><View style={styles.panel}>{nativeTechnicianSkills.length ? nativeTechnicianSkills.map((skill) => <Row key={skill.id} icon={skill.verified ? "checkmark-circle-outline" : "time-outline"} title={skill.category} detail={skill.verified ? "Verified for dispatch" : "Pending operations review"} />) : <View style={{ padding: 15 }}><Text style={styles.rowDetail}>Declare the services you provide. Each skill requires operations review before dispatch can use it.</Text></View>}<View style={{ padding: 15, paddingTop: nativeTechnicianSkills.length ? 0 : 12, gap: 10 }}>{technicianSkillOptions.filter((option) => !nativeTechnicianSkills.some((skill) => skill.category.toLowerCase() === option.label.toLowerCase())).map((option) => <Press key={option.api} disabled={nativeTechnicianActionLoading} onPress={() => void declareNativeTechnicianSkill(option.api)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeTechnicianActionLoading ? "Saving skill…" : `Add ${option.label}`}</Text><AppIcon name="add-circle-outline" size={18} /></Press>)}</View></View></> : null}
         <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Notification, maps, payments, and AI diagnosis connect to secure backend services when configured for your pilot.</Text></View>
       </ScrollView>
     );

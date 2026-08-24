@@ -82,3 +82,4 @@
 - [x] Add a native protected technician-profile application flow and persisted availability controls, with truthful pending-verification feedback.
 - [x] Let a verified technician share current device coordinates through a protected profile update so dispatch can evaluate real availability distance.
 - [x] Let operations administrators review pending technician profiles and persist verified or suspended status through protected controls.
+- [x] Let technicians declare service skills for protected review and let operations administrators verify those skills before dispatch eligibility.

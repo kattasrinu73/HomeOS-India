@@ -33,6 +33,8 @@ import {
   thirtyDayWarrantyEnds,
   verifyCompletionOtp,
   rankDispatchCandidates,
+  canTechnicianAdvanceJob,
+  technicianProgressTransitions,
 } from "./homeosWorkflow";
 
 const categories = ["electrical", "plumbing", "ac_appliances", "carpentry", "cleaning", "ro", "painting", "other"] as const;
@@ -462,8 +464,8 @@ export const homeosRouter = router({
         }
         const [request] = await db.select().from(serviceRequests).where(and(eq(serviceRequests.id, input.serviceRequestId), eq(serviceRequests.assignedTechnicianId, technician.id))).limit(1);
         if (!request) throw new TRPCError({ code: "FORBIDDEN", message: "This request is not assigned to you." });
-        const expectedCurrentStatus = input.nextStatus === "en_route" ? "assigned" : input.nextStatus === "arrived" ? "en_route" : "arrived";
-        if (request.status !== expectedCurrentStatus) {
+        const expectedCurrentStatus = technicianProgressTransitions[input.nextStatus];
+        if (!canTechnicianAdvanceJob(request.status, input.nextStatus)) {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: `This job must be ${expectedCurrentStatus.replaceAll("_", " ")} before it can be marked ${input.nextStatus.replaceAll("_", " ")}.` });
         }
         await db.update(serviceRequests).set({ status: input.nextStatus }).where(eq(serviceRequests.id, request.id));

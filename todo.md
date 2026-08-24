@@ -67,3 +67,4 @@
 - [x] Let an authenticated native technician create an itemised protected quote for an assigned job before requesting customer approval.
 - [x] Add protected native technician transitions from assigned through en route, arrival, and diagnosis so an itemised quote can be created at a valid server state.
 - [x] Render the assigned technician identity from the selected protected request detail in native customer tracking instead of a generic pending placeholder.
+- [x] Extract and test the permitted technician progress sequence used by the protected travel, arrival, and diagnosis endpoint.

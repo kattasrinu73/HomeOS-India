@@ -3,6 +3,7 @@ import {
   buildInvoicePayload,
   buildInvoiceMetadata,
   canStartWork,
+  canTechnicianAdvanceJob,
   hashCompletionOtp,
   rankDispatchCandidates,
   thirtyDayWarrantyEnds,
@@ -35,6 +36,15 @@ describe("HomeOS service workflow", () => {
     expect(canStartWork("quote_approved", null)).toBe(false);
     expect(canStartWork("quote_pending", new Date())).toBe(false);
     expect(canStartWork("quote_approved", new Date())).toBe(true);
+  });
+
+  it("allows technician progress only through the protected travel and diagnosis sequence", () => {
+    expect(canTechnicianAdvanceJob("assigned", "en_route")).toBe(true);
+    expect(canTechnicianAdvanceJob("en_route", "arrived")).toBe(true);
+    expect(canTechnicianAdvanceJob("arrived", "diagnosing")).toBe(true);
+    expect(canTechnicianAdvanceJob("assigned", "arrived")).toBe(false);
+    expect(canTechnicianAdvanceJob("arrived", "en_route")).toBe(false);
+    expect(canTechnicianAdvanceJob("diagnosing", "arrived")).toBe(false);
   });
 
   it("validates the completion OTP without storing it in plain text", () => {

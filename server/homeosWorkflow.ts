@@ -24,6 +24,16 @@ export type DispatchCandidate = {
   verifiedSkill: boolean;
 };
 
+export const technicianProgressTransitions = {
+  en_route: "assigned",
+  arrived: "en_route",
+  diagnosing: "arrived",
+} as const;
+
+export function canTechnicianAdvanceJob(currentStatus: ServiceJobStatus, nextStatus: keyof typeof technicianProgressTransitions): boolean {
+  return currentStatus === technicianProgressTransitions[nextStatus];
+}
+
 export function scoreCandidate(candidate: DispatchCandidate): number {
   if (!candidate.available || !candidate.verifiedSkill) return Number.NEGATIVE_INFINITY;
   const distanceScore = Math.max(0, 100 - candidate.distanceKm * 12);

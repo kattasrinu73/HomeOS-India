@@ -80,3 +80,4 @@
 - [x] Derive every visible native technician summary metric from assigned job records and confirmed payments, with focused aggregation coverage.
 - [x] Synchronise and display the signed-in protected account identity in the native customer app instead of generic initials and greeting copy.
 - [x] Add a native protected technician-profile application flow and persisted availability controls, with truthful pending-verification feedback.
+- [x] Let a verified technician share current device coordinates through a protected profile update so dispatch can evaluate real availability distance.

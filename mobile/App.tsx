@@ -591,6 +591,29 @@ export default function App() {
     }
   };
 
+  const shareNativeTechnicianLocation = async () => {
+    if (!nativeTechnician || nativeTechnician.verificationStatus !== "verified") {
+      Alert.alert("Verification required", "HomeOS verifies a technician profile before it can share an availability location for dispatch.");
+      return;
+    }
+    const permission = await Location.requestForegroundPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Location permission needed", "Allow location access to share your current dispatch area with HomeOS.");
+      return;
+    }
+    setNativeTechnicianActionLoading(true);
+    try {
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      await (homeosApi as any).homeos.account.updateLocation.mutate({ latitude: location.coords.latitude, longitude: location.coords.longitude });
+      await refreshNativeHome();
+      Alert.alert("Dispatch location updated", "HomeOS saved your current location for verified distance-based dispatch.");
+    } catch {
+      Alert.alert("Location update unavailable", "HomeOS could not save your protected dispatch location right now. Please try again.");
+    } finally {
+      setNativeTechnicianActionLoading(false);
+    }
+  };
+
   const saveNativeHomeSetup = async () => {
     const address = nativeHomeAddress.trim() || locationLabel.trim();
     if (!address || address === "Set service location") {
@@ -995,7 +1018,7 @@ export default function App() {
         <SectionTitle title="App mode" />
         <Press onPress={() => void updateNativeRole("technician")} style={styles.modeSwitch}><View style={styles.modeSwitchIcon}><AppIcon name="construct-outline" size={23} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>Open technician workspace</Text><Text style={styles.rowDetail}>{nativeAccountIntent === "technician" ? "Saved technician workspace preference." : "Review and manage service opportunities."}</Text></View><AppIcon name="arrow-forward" size={18} /></Press>
         <SectionTitle title="Technician profile" />
-        {nativeTechnician ? <View style={styles.panel}><Row icon="shield-checkmark-outline" title={nativeTechnician.displayName} detail={`Verification: ${nativeTechnician.verificationStatus} · Availability: ${nativeTechnician.availability}`} />{nativeTechnician.verificationStatus === "verified" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Press disabled={nativeTechnicianActionLoading} onPress={() => void setNativeTechnicianAvailability(nativeTechnician.availability === "available" ? "offline" : "available")} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeTechnicianActionLoading ? "Saving availability…" : nativeTechnician.availability === "available" ? "Set unavailable" : "Set available for dispatch"}</Text><AppIcon name={nativeTechnician.availability === "available" ? "pause-outline" : "radio-outline"} size={18} /></Press><Press disabled={nativeTechnicianActionLoading} onPress={() => void setNativeTechnicianAvailability("busy")} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Set busy</Text><AppIcon name="time-outline" size={18} /></Press></View> : <View style={{ padding: 15, paddingTop: 0 }}><Text style={styles.rowDetail}>{nativeTechnician.verificationStatus === "pending" ? "Verification is pending. Dispatch offers and availability remain unavailable until HomeOS verifies this profile." : "This profile is not currently eligible for dispatch. Contact HomeOS support for verification review."}</Text></View>}</View> : <View style={styles.inputPanel}><Text style={styles.inputLabel}>Professional display name</Text><TextInput value={technicianApplicationName} onChangeText={setTechnicianApplicationName} placeholder="Your technician business name" placeholderTextColor="#98958D" style={[styles.textArea, { minHeight: 42, paddingVertical: 0 }]} /><View style={{ marginTop: 12 }}><PrimaryButton disabled={nativeTechnicianActionLoading || nativeSyncStatus !== "ready"} label={nativeTechnicianActionLoading ? "Submitting profile…" : "Apply as a technician"} icon="construct-outline" onPress={applyForTechnicianProfile} /></View><Text style={styles.rowDetail}>New profiles are saved as pending and cannot receive dispatch offers until HomeOS verifies them.</Text></View>}
+        {nativeTechnician ? <View style={styles.panel}><Row icon="shield-checkmark-outline" title={nativeTechnician.displayName} detail={`Verification: ${nativeTechnician.verificationStatus} · Availability: ${nativeTechnician.availability}`} />{nativeTechnician.verificationStatus === "verified" ? <View style={{ padding: 15, paddingTop: 0, gap: 10 }}><Press disabled={nativeTechnicianActionLoading} onPress={() => void setNativeTechnicianAvailability(nativeTechnician.availability === "available" ? "offline" : "available")} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeTechnicianActionLoading ? "Saving availability…" : nativeTechnician.availability === "available" ? "Set unavailable" : "Set available for dispatch"}</Text><AppIcon name={nativeTechnician.availability === "available" ? "pause-outline" : "radio-outline"} size={18} /></Press><Press disabled={nativeTechnicianActionLoading} onPress={() => void setNativeTechnicianAvailability("busy")} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Set busy</Text><AppIcon name="time-outline" size={18} /></Press><Press disabled={nativeTechnicianActionLoading} onPress={() => void shareNativeTechnicianLocation()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeTechnicianActionLoading ? "Updating dispatch location…" : "Share current dispatch location"}</Text><AppIcon name="navigate-outline" size={18} /></Press></View> : <View style={{ padding: 15, paddingTop: 0 }}><Text style={styles.rowDetail}>{nativeTechnician.verificationStatus === "pending" ? "Verification is pending. Dispatch offers and availability remain unavailable until HomeOS verifies this profile." : "This profile is not currently eligible for dispatch. Contact HomeOS support for verification review."}</Text></View>}</View> : <View style={styles.inputPanel}><Text style={styles.inputLabel}>Professional display name</Text><TextInput value={technicianApplicationName} onChangeText={setTechnicianApplicationName} placeholder="Your technician business name" placeholderTextColor="#98958D" style={[styles.textArea, { minHeight: 42, paddingVertical: 0 }]} /><View style={{ marginTop: 12 }}><PrimaryButton disabled={nativeTechnicianActionLoading || nativeSyncStatus !== "ready"} label={nativeTechnicianActionLoading ? "Submitting profile…" : "Apply as a technician"} icon="construct-outline" onPress={applyForTechnicianProfile} /></View><Text style={styles.rowDetail}>New profiles are saved as pending and cannot receive dispatch offers until HomeOS verifies them.</Text></View>}
         <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Notification, maps, payments, and AI diagnosis connect to secure backend services when configured for your pilot.</Text></View>
       </ScrollView>
     );

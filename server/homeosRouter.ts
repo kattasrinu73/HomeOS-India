@@ -232,6 +232,17 @@ export const homeosRouter = router({
         await db.update(technicians).set({ availability: input.availability }).where(eq(technicians.id, technician.id));
         return { success: true, availability: input.availability };
       }),
+    updateLocation: protectedProcedure
+      .input(z.object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await databaseOrThrow();
+        const [technician] = await db.select().from(technicians).where(eq(technicians.userId, ctx.user.id)).limit(1);
+        if (!technician) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Create a technician profile before sharing a dispatch location." });
+        if (technician.verificationStatus !== "verified") throw new TRPCError({ code: "FORBIDDEN", message: "Only verified technicians can share a dispatch location." });
+        const locationUpdatedAt = new Date();
+        await db.update(technicians).set({ latitude: input.latitude.toFixed(7), longitude: input.longitude.toFixed(7), locationUpdatedAt }).where(eq(technicians.id, technician.id));
+        return { success: true, locationUpdatedAt };
+      }),
   }),
   diagnosis: router({
     assess: protectedProcedure

@@ -114,6 +114,10 @@ type SyncedNotification = {
   createdAt: Date | string;
 };
 
+type NativeAccountProfile = {
+  profile: { serviceIntent: "customer" | "technician" } | null;
+};
+
 type NativeRequestDetail = {
   request: SyncedServiceRequest;
   technician: { displayName: string } | null;
@@ -278,6 +282,7 @@ export default function App() {
   const [syncedAppliances, setSyncedAppliances] = useState<SyncedAppliance[]>([]);
   const [syncedPassportHistory, setSyncedPassportHistory] = useState<NativePassportHistory | null>(null);
   const [syncedNotifications, setSyncedNotifications] = useState<SyncedNotification[]>([]);
+  const [nativeAccountIntent, setNativeAccountIntent] = useState<"customer" | "technician" | null>(null);
   const [syncedRequestDetail, setSyncedRequestDetail] = useState<NativeRequestDetail | null>(null);
   const [nativeAssessment, setNativeAssessment] = useState<NativeAssessment | null>(null);
   const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
@@ -311,14 +316,17 @@ export default function App() {
     }
     setNativeSyncStatus("loading");
     try {
-      const [homes, requests, notificationRecords] = await Promise.all([
+      const [homes, requests, notificationRecords, account] = await Promise.all([
         (homeosApi as any).homeos.homes.list.query() as Promise<SyncedHome[]>,
         (homeosApi as any).homeos.requests.list.query() as Promise<SyncedServiceRequest[]>,
         (homeosApi as any).homeos.notifications.list.query() as Promise<SyncedNotification[]>,
+        (homeosApi as any).homeos.account.profile.query() as Promise<NativeAccountProfile>,
       ]);
       setSyncedHome(homes[0] ?? null);
       setSyncedRequests(requests);
       setSyncedNotifications(notificationRecords);
+      setNativeAccountIntent(account.profile?.serviceIntent ?? null);
+      if (account.profile?.serviceIntent) setRole(account.profile.serviceIntent);
       const [documents, applianceRecords, passportHistory] = homes[0]
         ? await Promise.all([
           (homeosApi as any).homeos.passport.listDocuments.query({ homeId: homes[0].id }) as Promise<SyncedPassportDocument[]>,
@@ -344,6 +352,7 @@ export default function App() {
       setSyncedAppliances([]);
       setSyncedPassportHistory(null);
       setSyncedNotifications([]);
+      setNativeAccountIntent(null);
       setSyncedRequestDetail(null);
       setNativeSyncStatus("signin_required");
     }
@@ -513,8 +522,24 @@ export default function App() {
     setSyncedAppliances([]);
     setSyncedPassportHistory(null);
     setSyncedNotifications([]);
+    setNativeAccountIntent(null);
     setSyncedRequestDetail(null);
+    setRole("customer");
     setNativeSyncStatus("signin_required");
+  };
+
+  const updateNativeRole = async (nextRole: "customer" | "technician") => {
+    if (nativeSyncStatus !== "ready") {
+      Alert.alert("Sign in required", "Sign in to save your HomeOS customer or technician workspace preference.");
+      return;
+    }
+    try {
+      await (homeosApi as any).homeos.account.setServiceIntent.mutate({ serviceIntent: nextRole });
+      setNativeAccountIntent(nextRole);
+      setRole(nextRole);
+    } catch {
+      Alert.alert("Workspace unavailable", "HomeOS could not save this protected workspace preference right now. Please try again.");
+    }
   };
 
   const saveNativeHomeSetup = async () => {
@@ -915,14 +940,14 @@ export default function App() {
         <SectionTitle title={`Updates${syncedNotifications.filter((notification) => !notification.readAt).length ? ` · ${syncedNotifications.filter((notification) => !notification.readAt).length} new` : ""}`} />
         <View style={styles.panel}>{syncedNotifications.length ? syncedNotifications.slice(0, 5).map((notification, index) => <View key={notification.id}><Row icon={notification.readAt ? "notifications-outline" : "notifications"} title={notification.title} detail={`${notification.readAt ? "Read" : "New"} · ${notification.body}`} onPress={() => { if (!notification.readAt) void markNativeNotificationRead(notification.id); }} />{index < Math.min(syncedNotifications.length, 5) - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="notifications-outline" title="No synchronised updates" detail={nativeSyncStatus === "signin_required" ? "Sign in to view protected HomeOS updates." : "Service, payment, and warranty updates will appear here when they are saved."} />}</View>
         <SectionTitle title="App mode" />
-        <Press onPress={() => setRole("technician")} style={styles.modeSwitch}><View style={styles.modeSwitchIcon}><AppIcon name="construct-outline" size={23} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>Open technician workspace</Text><Text style={styles.rowDetail}>Review and manage service opportunities.</Text></View><AppIcon name="arrow-forward" size={18} /></Press>
+        <Press onPress={() => void updateNativeRole("technician")} style={styles.modeSwitch}><View style={styles.modeSwitchIcon}><AppIcon name="construct-outline" size={23} /></View><View style={styles.rowCopy}><Text style={styles.rowTitle}>Open technician workspace</Text><Text style={styles.rowDetail}>{nativeAccountIntent === "technician" ? "Saved technician workspace preference." : "Review and manage service opportunities."}</Text></View><AppIcon name="arrow-forward" size={18} /></Press>
         <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Notification, maps, payments, and AI diagnosis connect to secure backend services when configured for your pilot.</Text></View>
       </ScrollView>
     );
   };
 
   if (role === "technician") {
-    return <NativeTechnicianWorkspace onBackToCustomer={() => setRole("customer")} />;
+    return <NativeTechnicianWorkspace onBackToCustomer={() => void updateNativeRole("customer")} />;
   }
 
   return (

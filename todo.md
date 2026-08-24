@@ -57,3 +57,4 @@
 - [ ] Add router-level Vitest coverage for quote approval, start-work gating, OTP completion, and confirmed-payment invoice/warranty transitions.
 - [ ] Extend AI assessment to use an uploaded issue attachment and test assessment/upload paths with and without an image.
 - [ ] Connect newly created requests to an actual dispatch-round operator flow, persist real customer selection where required, and test radius expansion plus offer outcomes.
+- [ ] Implement native OAuth session establishment and account-access UI, securely store the resulting HomeOS session token, and verify Passport document upload/listing on an authenticated Android device.

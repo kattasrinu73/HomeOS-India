@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -65,6 +67,34 @@ type SyncedHome = {
   locality: string;
   city: string;
   healthScore: number;
+};
+
+type SyncedServiceRequest = {
+  id: number;
+  publicId: string;
+  category: string;
+  status: JobStatus;
+  urgency: string;
+  description: string;
+};
+
+type SyncedPassportDocument = {
+  id: number;
+  documentType: string;
+  label: string;
+  fileUrl: string;
+  mimeType: string;
+  fileSize: number;
+};
+
+type NativeAssessment = {
+  category: "electrical" | "plumbing" | "ac_appliances" | "carpentry" | "cleaning" | "ro" | "painting" | "other";
+  urgency: "low" | "medium" | "high" | "emergency";
+  possibleDiagnosis: string;
+  safetyNote: string;
+  followUpQuestions: string[];
+  estimateMin: number;
+  estimateMax: number;
 };
 
 const statusCopy: Record<JobStatus, string> = {
@@ -203,6 +233,12 @@ export default function App() {
   const [onboardingVisible, setOnboardingVisible] = useState(false);
   const [homeStep, setHomeStep] = useState(0);
   const [syncedHome, setSyncedHome] = useState<SyncedHome | null>(null);
+  const [syncedRequests, setSyncedRequests] = useState<SyncedServiceRequest[]>([]);
+  const [syncedDocuments, setSyncedDocuments] = useState<SyncedPassportDocument[]>([]);
+  const [nativeAssessment, setNativeAssessment] = useState<NativeAssessment | null>(null);
+  const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
+  const [nativeCreatingRequest, setNativeCreatingRequest] = useState(false);
+  const [nativeDocumentUploading, setNativeDocumentUploading] = useState(false);
   const [nativeSyncStatus, setNativeSyncStatus] = useState<"loading" | "ready" | "signin_required" | "unavailable">("loading");
 
   const warrantyEnd = useMemo(() => warrantyEndsOn(new Date()), []);
@@ -221,11 +257,21 @@ export default function App() {
     }
     setNativeSyncStatus("loading");
     try {
-      const homes = await (homeosApi as any).homeos.homes.list.query() as SyncedHome[];
+      const [homes, requests] = await Promise.all([
+        (homeosApi as any).homeos.homes.list.query() as Promise<SyncedHome[]>,
+        (homeosApi as any).homeos.requests.list.query() as Promise<SyncedServiceRequest[]>,
+      ]);
       setSyncedHome(homes[0] ?? null);
+      setSyncedRequests(requests);
+      const documents = homes[0]
+        ? await (homeosApi as any).homeos.passport.listDocuments.query({ homeId: homes[0].id }) as SyncedPassportDocument[]
+        : [];
+      setSyncedDocuments(documents);
       setNativeSyncStatus("ready");
     } catch {
       setSyncedHome(null);
+      setSyncedRequests([]);
+      setSyncedDocuments([]);
       setNativeSyncStatus("signin_required");
     }
   };
@@ -266,6 +312,54 @@ export default function App() {
     if (!result.canceled) setAttachmentUri(result.assets[0]?.uri ?? null);
   };
 
+  const choosePassportDocument = async () => {
+    if (!syncedHome || nativeSyncStatus !== "ready") {
+      Alert.alert("Sign in required", "Sign in and save a HomeOS home before adding protected Passport documents.");
+      return;
+    }
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    const mimeType = asset?.mimeType;
+    const fileSize = asset?.size;
+    if (!asset || !mimeType || !fileSize) {
+      Alert.alert("Document unavailable", "Choose a PDF, JPG, PNG, or WEBP file with a readable file size.");
+      return;
+    }
+    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
+      Alert.alert("Unsupported file", "Use a PDF, JPG, PNG, or WEBP document.");
+      return;
+    }
+    if (fileSize > 10 * 1024 * 1024) {
+      Alert.alert("Document too large", "Choose a Passport document smaller than 10 MB.");
+      return;
+    }
+    setNativeDocumentUploading(true);
+    try {
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const stored = await (homeosApi as any).homeos.uploads.storeDocument.mutate({ base64: `data:${mimeType};base64,${base64}`, mimeType });
+      await (homeosApi as any).homeos.passport.addDocument.mutate({
+        homeId: syncedHome.id,
+        documentType: "service_document",
+        label: asset.name || "Passport document",
+        fileKey: stored.key,
+        fileUrl: stored.url,
+        mimeType,
+        fileSize,
+      });
+      await refreshNativeHome();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Upload unavailable", "HomeOS could not secure this Passport document right now. Please try again.");
+    } finally {
+      setNativeDocumentUploading(false);
+    }
+  };
+
   const useLocation = async () => {
     const permission = await Location.requestForegroundPermissionsAsync();
     if (!permission.granted) {
@@ -280,18 +374,53 @@ export default function App() {
     }
   };
 
-  const submitIssue = () => {
+  const submitIssue = async () => {
     if (!issue.trim()) {
       Alert.alert("Describe the issue", "Tell us what is happening at home so we can guide you.");
       return;
     }
-    setJobStatus("submitted");
-    setScreen("analysis");
+    if (nativeSyncStatus !== "ready" || !syncedHome) {
+      Alert.alert("Sign in required", "Sign in with your HomeOS account and save a home before requesting a protected AI assessment.");
+      return;
+    }
+    setNativeSubmittingIssue(true);
+    try {
+      const assessment = await (homeosApi as any).homeos.diagnosis.assess.mutate({ description: issue }) as NativeAssessment;
+      setNativeAssessment(assessment);
+      setSelectedCategory(assessment.category.replaceAll("_", " "));
+      setJobStatus("submitted");
+      setScreen("analysis");
+    } catch {
+      Alert.alert("Assessment unavailable", "HomeOS could not complete the protected assessment right now. Please try again.");
+    } finally {
+      setNativeSubmittingIssue(false);
+    }
   };
 
-  const showMatches = () => {
-    setJobStatus("matched");
-    setScreen("matches");
+  const showMatches = async () => {
+    if (!nativeAssessment || !syncedHome) {
+      Alert.alert("Assessment required", "Complete the protected issue assessment before requesting a technician match.");
+      return;
+    }
+    setNativeCreatingRequest(true);
+    try {
+      const request = await (homeosApi as any).homeos.requests.create.mutate({
+        homeId: syncedHome.id,
+        category: nativeAssessment.category,
+        description: issue,
+        possibleDiagnosis: nativeAssessment.possibleDiagnosis,
+        urgency: nativeAssessment.urgency,
+        estimateMin: nativeAssessment.estimateMin,
+        estimateMax: nativeAssessment.estimateMax,
+      }) as SyncedServiceRequest;
+      setSyncedRequests((requests) => [request, ...requests.filter((existing) => existing.id !== request.id)]);
+      setJobStatus("submitted");
+      setScreen("matches");
+    } catch {
+      Alert.alert("Request unavailable", "HomeOS could not create your secure service request right now. Please try again.");
+    } finally {
+      setNativeCreatingRequest(false);
+    }
   };
 
   const selectTechnician = () => {
@@ -362,10 +491,10 @@ export default function App() {
             <Press onPress={() => setScreen("passport")} style={styles.roundLink}><AppIcon name="arrow-forward" size={18} /></Press>
           </View>
 
-          <Press onPress={() => setScreen(jobStatus === "paid" ? "invoice" : "tracking")} style={styles.homeActiveJob}>
-            <View style={styles.homeActiveJobTop}><Pill label={statusCopy[jobStatus].toUpperCase()} tone="success" /><Text style={styles.homeActiveJobEta}>About 12 min</Text></View>
-            <View style={styles.homeActiveJobBody}><View style={styles.homeActiveJobIcon}><AppIcon name="snow-outline" size={21} color={C.white} /></View><View style={styles.rowCopy}><Text style={styles.homeActiveJobTitle}>AC cooling check</Text><Text style={styles.homeActiveJobDetail}>Ramesh Kumar · Tap to track your job</Text></View><AppIcon name="chevron-forward" size={19} color={C.white} /></View>
-          </Press>
+          {syncedRequests[0] ? <Press onPress={() => setScreen("tracking")} style={styles.homeActiveJob}>
+            <View style={styles.homeActiveJobTop}><Pill label={syncedRequests[0].status.replaceAll("_", " ").toUpperCase()} tone="success" /><Text style={styles.homeActiveJobEta}>{syncedRequests[0].urgency} priority</Text></View>
+            <View style={styles.homeActiveJobBody}><View style={styles.homeActiveJobIcon}><AppIcon name="construct-outline" size={21} color={C.white} /></View><View style={styles.rowCopy}><Text style={styles.homeActiveJobTitle}>{syncedRequests[0].category.replaceAll("_", " ")}</Text><Text style={styles.homeActiveJobDetail}>{syncedRequests[0].publicId} · Tap to view service status</Text></View><AppIcon name="chevron-forward" size={19} color={C.white} /></View>
+          </Press> : <Press onPress={() => startFix()} style={styles.homeActiveJob}><View style={styles.homeActiveJobTop}><Pill label="NO ACTIVE REQUEST" tone="success" /><Text style={styles.homeActiveJobEta}>Start when ready</Text></View><View style={styles.homeActiveJobBody}><View style={styles.homeActiveJobIcon}><AppIcon name="add" size={21} color={C.white} /></View><View style={styles.rowCopy}><Text style={styles.homeActiveJobTitle}>Tell us what’s wrong</Text><Text style={styles.homeActiveJobDetail}>A saved service request will appear here after it is synchronised.</Text></View><AppIcon name="chevron-forward" size={19} color={C.white} /></View></Press>}
 
           <SectionTitle title="Quick services" action="View all" />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.serviceRail}>
@@ -414,7 +543,7 @@ export default function App() {
             </Press>
             <View style={styles.guidanceBox}><AppIcon name="shield-checkmark-outline" size={19} color={C.success} /><Text style={styles.guidanceText}>We use this information to recommend a service—not to replace an on-site professional diagnosis.</Text></View>
           </ScrollView>
-          <View style={styles.stickyAction}><PrimaryButton label="Continue to guidance" icon="arrow-forward" onPress={submitIssue} /></View>
+          <View style={styles.stickyAction}><PrimaryButton disabled={nativeSubmittingIssue} label={nativeSubmittingIssue ? "Assessing securely…" : "Continue to guidance"} icon="arrow-forward" onPress={submitIssue} /></View>
         </KeyboardAvoidingView>
       );
     }
@@ -424,18 +553,16 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Guided assessment" onBack={() => setScreen("fix")} />
           <Pill label="ESTIMATE, NOT A DIAGNOSIS" tone="warm" />
-          <Text style={styles.flowTitle}>A few focused questions.</Text>
-          <Text style={styles.flowSubtitle}>Your answers help us match the right skill set and set expectations before a visit.</Text>
-          <View style={styles.questionCard}><Text style={styles.questionNumber}>01</Text><Text style={styles.questionText}>Is the AC unit running, even though the room is not cooling?</Text><View style={styles.choiceRow}><Pill label="Yes" tone="dark" /><Pill label="Not sure" /></View></View>
-          <View style={styles.questionCard}><Text style={styles.questionNumber}>02</Text><Text style={styles.questionText}>Do you notice a burning smell, sparks, or unusual smoke?</Text><View style={styles.choiceRow}><Pill label="No" tone="success" /><Pill label="Not sure" /></View></View>
+          <Text style={styles.flowTitle}>Pre-visit guidance.</Text>
+          <Text style={styles.flowSubtitle}>This protected assessment is preliminary. A qualified professional confirms the cause on site.</Text>
           <View style={styles.analysisCard}>
             <View style={styles.analysisTitleRow}><View style={styles.sparkBadge}><AppIcon name="sparkles" size={17} color={C.white} /></View><Text style={styles.analysisHeading}>Pre-visit guidance</Text></View>
-            <Text style={styles.analysisDiagnosis}>Possible cooling or airflow issue.</Text>
-            <Text style={styles.analysisBody}>A technician should inspect filters, cooling performance, and electrical connections before confirming the remedy.</Text>
-            <View style={styles.analysisMeta}><View><Text style={styles.metaLabel}>RECOMMENDED SERVICE</Text><Text style={styles.metaValue}>AC & appliance technician</Text></View><View style={styles.metaDivider} /><View><Text style={styles.metaLabel}>URGENCY</Text><Text style={styles.metaValue}>Medium</Text></View></View>
+            <Text style={styles.analysisDiagnosis}>{nativeAssessment?.possibleDiagnosis ?? "Secure assessment unavailable."}</Text>
+            <Text style={styles.analysisBody}>{nativeAssessment?.safetyNote ?? "Return to the issue screen and complete the protected assessment before requesting a technician."}</Text>
+            <View style={styles.analysisMeta}><View><Text style={styles.metaLabel}>RECOMMENDED SERVICE</Text><Text style={styles.metaValue}>{nativeAssessment?.category.replaceAll("_", " ") ?? "Not available"}</Text></View><View style={styles.metaDivider} /><View><Text style={styles.metaLabel}>URGENCY</Text><Text style={styles.metaValue}>{nativeAssessment?.urgency ?? "Not available"}</Text></View></View>
           </View>
-          <View style={styles.estimateCard}><Text style={styles.estimateTitle}>Indicative visit estimate</Text><Text style={styles.estimatePrice}>{formatIndianRupees(199)}–{formatIndianRupees(1200)}</Text><Text style={styles.estimateNote}>The final amount depends on the on-site diagnosis, parts, and your approval of an itemised quote.</Text></View>
-          <PrimaryButton label="Find a technician" icon="arrow-forward" onPress={showMatches} />
+          <View style={styles.estimateCard}><Text style={styles.estimateTitle}>Indicative visit estimate</Text><Text style={styles.estimatePrice}>{nativeAssessment ? `${formatIndianRupees(nativeAssessment.estimateMin)}–${formatIndianRupees(nativeAssessment.estimateMax)}` : "Not available"}</Text><Text style={styles.estimateNote}>The final amount depends on the on-site diagnosis, parts, and your approval of an itemised quote.</Text></View>
+          <PrimaryButton disabled={nativeCreatingRequest || !nativeAssessment} label={nativeCreatingRequest ? "Creating secure request…" : "Request qualified matching"} icon="arrow-forward" onPress={showMatches} />
         </ScrollView>
       );
     }
@@ -446,9 +573,9 @@ export default function App() {
           <ScreenHeader title="Find a qualified professional" onBack={() => setScreen("analysis")} />
           <Text style={styles.flowTitle}>Controlled verified matching.</Text>
           <Text style={styles.flowSubtitle}>The signed-in HomeOS service creates a request, then dispatches real eligible professionals by verified skill, availability, distance, and reliability.</Text>
-          <View style={[styles.matchCard, styles.matchCardSelected]}><View style={styles.matchTop}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={24} color={C.white} /></View><View style={styles.matchName}><Text style={styles.matchPerson}>Awaiting secure dispatch</Text><Text style={styles.matchSpecialty}>No technician, rating, availability, or ETA is shown until it is returned by the protected matching service.</Text></View></View><Text style={styles.matchFoot}>The Android client needs an authenticated backend transport before it can create this request and display the real accepted technician.</Text></View>
-          <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Use the signed-in HomeOS web app to submit a live request while native account synchronisation is being completed.</Text></View>
-          <PrimaryButton label="Return to issue details" icon="chevron-back" onPress={() => setScreen("fix")} />
+          <View style={[styles.matchCard, styles.matchCardSelected]}><View style={styles.matchTop}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={24} color={C.white} /></View><View style={styles.matchName}><Text style={styles.matchPerson}>{syncedRequests[0] ? syncedRequests[0].publicId : "Awaiting secure dispatch"}</Text><Text style={styles.matchSpecialty}>{syncedRequests[0] ? `${syncedRequests[0].category.replaceAll("_", " ")} request is ${syncedRequests[0].status.replaceAll("_", " ")}.` : "No technician, rating, availability, or ETA is shown until it is returned by the protected matching service."}</Text></View></View><Text style={styles.matchFoot}>HomeOS will show the real accepted technician after a verified offer is accepted. No fabricated professional details are displayed.</Text></View>
+          <View style={styles.guidanceBox}><AppIcon name="information-circle-outline" size={19} color={C.moss} /><Text style={styles.guidanceText}>Open Jobs to refresh the protected request status. Dispatch rounds are controlled by verified operations rules.</Text></View>
+          <PrimaryButton label="View synchronised jobs" icon="arrow-forward" onPress={() => { setTab("jobs"); setScreen("jobs"); }} />
         </ScrollView>
       );
     }
@@ -457,11 +584,10 @@ export default function App() {
       return (
         <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
           <ScreenHeader title="Active job" onBack={goHome} />
-          <View style={styles.trackingHeader}><Pill label="TECHNICIAN ON THE WAY" tone="success" /><Text style={styles.trackingTime}>Arriving in about 12 min</Text><Text style={styles.trackingAddress}>{locationLabel}</Text></View>
-          <View style={styles.mapFrame}><View style={styles.mapGrid} /><View style={[styles.mapRoad, styles.roadOne]} /><View style={[styles.mapRoad, styles.roadTwo]} /><View style={styles.routeLine} /><View style={styles.homePin}><AppIcon name="home" size={18} color={C.white} /></View><View style={styles.techPin}><AppIcon name="construct" size={17} color={C.white} /></View><View style={styles.mapLegend}><View style={styles.legendDot} /><Text style={styles.legendText}>Live location connects when the technician starts secure location sharing.</Text></View></View>
-          <View style={styles.techSummary}><View style={styles.techAvatar}><Text style={styles.techInitials}>RK</Text></View><View style={styles.techSummaryCopy}><Text style={styles.matchPerson}>Ramesh Kumar</Text><Text style={styles.matchSpecialty}>Verified AC & appliance specialist</Text></View><Press onPress={() => Alert.alert("Contact options", "Secure calling and chat are enabled when the dispatch provider is configured.")} style={styles.contactButton}><AppIcon name="chatbubble-outline" size={19} /></Press></View>
-          <View style={styles.timeline}><Timeline active label="Match confirmed" detail="Your service specialist has been selected." /><Timeline active label="On the way" detail="Location and ETA will update here." /><Timeline label="Diagnosis & quote" detail="No work begins before you approve the quote." /><Timeline label="Completion" detail="A one-time OTP is required to close the job." /></View>
-          <PrimaryButton label="Technician has arrived" icon="arrow-forward" onPress={showQuote} />
+          <View style={styles.trackingHeader}><Pill label={(syncedRequests[0]?.status ?? "AWAITING DISPATCH").replaceAll("_", " ").toUpperCase()} tone="success" /><Text style={styles.trackingTime}>{syncedRequests[0] ? syncedRequests[0].publicId : "No synchronised request"}</Text><Text style={styles.trackingAddress}>{syncedHome ? `${syncedHome.locality}, ${syncedHome.city}` : locationLabel}</Text></View>
+          <View style={styles.mapFrame}><View style={styles.mapGrid} /><View style={[styles.mapRoad, styles.roadOne]} /><View style={[styles.mapRoad, styles.roadTwo]} /><View style={styles.homePin}><AppIcon name="home" size={18} color={C.white} /></View><View style={styles.mapLegend}><View style={styles.legendDot} /><Text style={styles.legendText}>A live route and ETA appear only after a real technician is assigned and shares location securely.</Text></View></View>
+          <View style={styles.techSummary}><View style={styles.techAvatar}><AppIcon name="shield-checkmark-outline" size={21} color={C.white} /></View><View style={styles.techSummaryCopy}><Text style={styles.matchPerson}>Technician pending</Text><Text style={styles.matchSpecialty}>HomeOS will show the verified accepted professional here.</Text></View></View>
+          <View style={styles.timeline}><Timeline active={Boolean(syncedRequests[0])} label="Request created" detail="Your protected request has been saved." /><Timeline label="Technician assignment" detail="Verified dispatch will update this screen after an offer is accepted." /><Timeline label="Diagnosis & quote" detail="No work begins before you approve the quote." /><Timeline label="Completion" detail="A one-time OTP is required to close the job." /></View>
         </ScrollView>
       );
     }
@@ -522,10 +648,8 @@ export default function App() {
     if (screen === "jobs") {
       return (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <ScreenHeader title="Your jobs" action={<Pill label="1 ACTIVE" tone="success" />} />
-          <Press onPress={() => setScreen(jobStatus === "paid" ? "invoice" : "tracking")} style={styles.activeJobCard}><View style={styles.activeJobTop}><Pill label={statusCopy[jobStatus].toUpperCase()} tone="success" /><AppIcon name="chevron-forward" size={18} color={C.white} /></View><Text style={styles.activeJobTitle}>AC cooling check</Text><Text style={styles.activeJobDetail}>Ramesh Kumar · {locationLabel}</Text><View style={styles.activeJobLine} /><Text style={styles.activeJobAction}>{statusCopy[jobStatus]}</Text></Press>
-          <SectionTitle title="Past service" />
-          <View style={styles.panel}><Row icon="snow-outline" title="AC general service" detail="Invoice and warranty record available" onPress={() => setScreen("passport")} /></View>
+          <ScreenHeader title="Your jobs" action={<Pill label={`${syncedRequests.length} ACTIVE`} tone="success" />} />
+          {nativeSyncStatus === "loading" ? <View style={styles.panel}><Row icon="sync-outline" title="Loading saved jobs" detail="Checking your protected HomeOS records." /></View> : syncedRequests.length ? syncedRequests.map((request) => <Press key={request.id} onPress={() => setScreen("tracking")} style={styles.activeJobCard}><View style={styles.activeJobTop}><Pill label={request.status.replaceAll("_", " ").toUpperCase()} tone="success" /><AppIcon name="chevron-forward" size={18} color={C.white} /></View><Text style={styles.activeJobTitle}>{request.category.replaceAll("_", " ")}</Text><Text style={styles.activeJobDetail}>{request.publicId} · {request.urgency} priority</Text><View style={styles.activeJobLine} /><Text style={styles.activeJobAction}>{request.description}</Text></Press>) : <View style={styles.panel}><Row icon="calendar-outline" title="No synchronised jobs" detail={nativeSyncStatus === "signin_required" ? "Sign in to load your protected HomeOS service records." : "New service requests will appear here after they are synchronised."} /></View>}
         </ScrollView>
       );
     }
@@ -538,6 +662,9 @@ export default function App() {
           <View style={styles.passportScore}><Text style={styles.metaLabel}>HOME HEALTH SCORE</Text><Text style={styles.passportScoreNumber}>{syncedHome?.healthScore ?? "—"} <Text style={styles.healthSuffix}>/ 100</Text></Text><Text style={styles.passportScoreDetail}>{syncedHome ? `Saved for ${syncedHome.label}.` : "Your score will appear after the signed-in app synchronises your saved home and service records."}</Text></View>
           <SectionTitle title="Service history" />
           <View style={styles.panel}><Row icon="document-text-outline" title="No synchronised service history yet" detail="Signed-in web service records, proof, invoices, and active warranties will appear here after native backend transport is enabled." /></View>
+          <SectionTitle title="Your documents" />
+          <View style={styles.panel}>{syncedDocuments.length ? syncedDocuments.map((document, index) => <View key={document.id}><Row icon="document-attach-outline" title={document.label} detail={`${document.documentType.replaceAll("_", " ")} · ${Math.ceil(document.fileSize / 1024)} KB`} />{index < syncedDocuments.length - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="document-outline" title="No Passport documents synchronised" detail={nativeSyncStatus === "signin_required" ? "Sign in to upload and view protected home documents." : "Add invoices, warranty papers, installation records, and service documents."} />}</View>
+          <Press onPress={choosePassportDocument} disabled={nativeDocumentUploading} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeDocumentUploading ? "Securing document…" : "Add Passport document"}</Text><AppIcon name="document-attach-outline" size={18} /></Press>
           <SectionTitle title="Your appliances" />
           <View style={styles.applianceCard}><View style={styles.applianceIcon}><AppIcon name="home-outline" size={25} /></View><View style={styles.applianceCopy}><Text style={styles.rowTitle}>No appliances synchronised</Text><Text style={styles.rowDetail}>Save appliance details in your signed-in HomeOS account to build this record.</Text></View><Press onPress={() => setOnboardingVisible(true)} style={styles.roundLink}><AppIcon name="add" size={19} /></Press></View>
         </ScrollView>

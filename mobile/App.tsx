@@ -282,6 +282,7 @@ export default function App() {
   const [nativeSubmittingIssue, setNativeSubmittingIssue] = useState(false);
   const [nativeCreatingRequest, setNativeCreatingRequest] = useState(false);
   const [nativeDocumentUploading, setNativeDocumentUploading] = useState(false);
+  const [nativeDocumentRemovingId, setNativeDocumentRemovingId] = useState<number | null>(null);
   const [nativeApplianceSaving, setNativeApplianceSaving] = useState(false);
   const [nativeHomeSaving, setNativeHomeSaving] = useState(false);
   const [nativeHomeAddress, setNativeHomeAddress] = useState("");
@@ -433,6 +434,23 @@ export default function App() {
       Alert.alert("Upload unavailable", "HomeOS could not secure this Passport document right now. Please try again.");
     } finally {
       setNativeDocumentUploading(false);
+    }
+  };
+
+  const removePassportDocument = async (documentId: number) => {
+    if (!syncedHome || nativeSyncStatus !== "ready") {
+      Alert.alert("Sign in required", "Sign in to remove protected Passport documents.");
+      return;
+    }
+    setNativeDocumentRemovingId(documentId);
+    try {
+      await (homeosApi as any).homeos.passport.removeDocument.mutate({ documentId });
+      await refreshNativeHome();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Removal unavailable", "HomeOS could not remove this protected Passport document right now. Please try again.");
+    } finally {
+      setNativeDocumentRemovingId(null);
     }
   };
 
@@ -854,7 +872,7 @@ export default function App() {
             return <View key={request.id}><Row icon="document-text-outline" title={request.category.replaceAll("_", " ")} detail={`${request.publicId} · ${request.status.replaceAll("_", " ")} · ${protectionDetail}`} onPress={() => { setSelectedRequestPublicId(request.publicId); void refreshNativeHome(request.publicId); setScreen("tracking"); }} />{index < syncedPassportHistory.requests.length - 1 ? <View style={styles.panelLine} /> : null}</View>;
           }) : <Row icon="document-text-outline" title="No synchronised service history yet" detail={nativeSyncStatus === "signin_required" ? "Sign in to view protected service history." : "Completed services, invoices, and active warranties will appear here when they are saved."} />}</View>
           <SectionTitle title="Your documents" />
-          <View style={styles.panel}>{syncedDocuments.length ? syncedDocuments.map((document, index) => <View key={document.id}><Row icon="document-attach-outline" title={document.label} detail={`${document.documentType.replaceAll("_", " ")} · ${Math.ceil(document.fileSize / 1024)} KB`} />{index < syncedDocuments.length - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="document-outline" title="No Passport documents synchronised" detail={nativeSyncStatus === "signin_required" ? "Sign in to upload and view protected home documents." : "Add invoices, warranty papers, installation records, and service documents."} />}</View>
+          <View style={styles.panel}>{syncedDocuments.length ? syncedDocuments.map((document, index) => <View key={document.id}><Row icon="document-attach-outline" title={document.label} detail={`${document.documentType.replaceAll("_", " ")} · ${Math.ceil(document.fileSize / 1024)} KB`} /><Press onPress={() => void removePassportDocument(document.id)} disabled={nativeDocumentRemovingId === document.id} style={[styles.textOnlyButton, { paddingTop: 0, paddingBottom: 12 }]}><Text style={styles.textOnlyButtonText}>{nativeDocumentRemovingId === document.id ? "Removing protected document…" : "Remove document"}</Text></Press>{index < syncedDocuments.length - 1 ? <View style={styles.panelLine} /> : null}</View>) : <Row icon="document-outline" title="No Passport documents synchronised" detail={nativeSyncStatus === "signin_required" ? "Sign in to upload and view protected home documents." : "Add invoices, warranty papers, installation records, and service documents."} />}</View>
           <Press onPress={choosePassportDocument} disabled={nativeDocumentUploading} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{nativeDocumentUploading ? "Securing document…" : "Add Passport document"}</Text><AppIcon name="document-attach-outline" size={18} /></Press>
           <SectionTitle title="Your appliances" />
           {syncedAppliances.length ? syncedAppliances.map((appliance) => <View key={appliance.id} style={styles.applianceCard}><View style={styles.applianceIcon}><AppIcon name="home-outline" size={25} /></View><View style={styles.applianceCopy}><Text style={styles.rowTitle}>{[appliance.brand, appliance.model].filter(Boolean).join(" ") || appliance.category.replaceAll("_", " ")}</Text><Text style={styles.rowDetail}>{[appliance.category.replaceAll("_", " "), appliance.installedYear ? `Installed ${appliance.installedYear}` : null].filter(Boolean).join(" · ")}</Text></View></View>) : <View style={styles.applianceCard}><View style={styles.applianceIcon}><AppIcon name="home-outline" size={25} /></View><View style={styles.applianceCopy}><Text style={styles.rowTitle}>No appliances synchronised</Text><Text style={styles.rowDetail}>{nativeSyncStatus === "signin_required" ? "Sign in to view protected appliance records." : "Add appliance details to build this protected home record."}</Text></View></View>}

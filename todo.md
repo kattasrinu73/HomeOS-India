@@ -69,3 +69,4 @@
 - [x] Render the assigned technician identity from the selected protected request detail in native customer tracking instead of a generic pending placeholder.
 - [x] Extract and test the permitted technician progress sequence used by the protected travel, arrival, and diagnosis endpoint.
 - [x] Keep the deferred native payment surface explicitly provider-gated and prevent it from locally marking a service paid or complete.
+- [x] Add native removal controls for synchronised Passport document records through the protected owner-scoped procedure.

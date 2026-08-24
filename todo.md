@@ -94,3 +94,4 @@
 - [x] Remove the local native customer OTP completion transition so only the protected assigned-technician completion endpoint can advance a job, with customer UI returning to synchronised status instead.
 - [x] Remove unused native local job-state setters and navigation helpers so customer progress is derived only from synchronised service-request records.
 - [x] Show accepted Passport document types and the 10 MB protected upload limit before native file selection, while retaining picker and server validation.
+- [x] Record the latest successful internal Android APK containing provider-gated billing cleanup, server-status-only OTP guidance, and Passport upload constraints.

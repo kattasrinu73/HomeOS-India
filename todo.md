@@ -75,3 +75,4 @@
 - [x] Make existing-home native coordinate refresh transactional so local labels update only after protected persistence succeeds and backend failures have distinct feedback.
 - [x] Persist the native customer-versus-technician mode selection through the protected account-intent contract instead of using only local role state.
 - [x] Render native customer tracking milestones from the selected protected request status instead of a static service timeline.
+- [x] Remove the obsolete unrendered local technician demo so only the protected NativeTechnicianWorkspace remains in the Android client.

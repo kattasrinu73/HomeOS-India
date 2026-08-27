@@ -112,4 +112,4 @@
 - [x] Add protected manually created maintenance reminders and bind customer-home maintenance cards to persisted reminder and appliance records without background scheduling.
 - [x] Replace static web quick-service cards with persisted appliance-backed service shortcuts and a truthful no-appliance state.
 - [x] Remove static assessment fallback and locally selected payment methods from web customer flows; show only protected assessment results and provider-gated payment status.
-- [ ] Export the current validated HomeOS India repository to the user’s confirmed GitHub account and repository.
+- [x] Export the current validated HomeOS India repository to the user’s confirmed public GitHub repository at kattasrinu73/HomeOS-India.

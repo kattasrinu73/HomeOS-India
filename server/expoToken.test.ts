@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
+const expoToken = process.env.EXPO_TOKEN;
+const itWithExpoToken = expoToken ? it : it.skip;
+
 describe("Expo build authorization", () => {
-  it("validates the configured Expo access token against the current-user API", async () => {
-    const token = process.env.EXPO_TOKEN;
-    expect(token).toBeTruthy();
+  itWithExpoToken("validates the configured Expo access token against the current-user API", async () => {
+    expect(expoToken).toBeTruthy();
 
     const response = await fetch("https://api.expo.dev/graphql", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${expoToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ query: "query { me { id username } }" }),

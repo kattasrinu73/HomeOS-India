@@ -1,0 +1,52 @@
+name: Bug report
+description: Report a reproducible issue in HomeOS India.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve HomeOS India. Do not include passwords, OTPs, home addresses, document links, payment information, or other personal data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the observed behaviour and the expected behaviour.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Customer web experience
+        - Technician web experience
+        - Operations console
+        - Expo Android client
+        - Server or API
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include browser or device, operating system, app version or commit, and any relevant non-sensitive details.
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security check
+      options:
+        - label: This is not a security vulnerability or personal-data exposure. I will use the private reporting route in SECURITY.md if it is.
+          required: true

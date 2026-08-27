@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a user-centred improvement to HomeOS India.
+title: "feature: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please focus on a genuine user or operations need. Do not include personal data or credentials.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Who experiences this problem, and when?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: Describe the expected behaviour, including any safety, privacy, or role-based access implications.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: accuracy
+    attributes:
+      label: Accuracy and scope
+      options:
+        - label: This request does not depend on fabricated reviews, locally simulated payments, or unverified real-time claims.
+          required: true

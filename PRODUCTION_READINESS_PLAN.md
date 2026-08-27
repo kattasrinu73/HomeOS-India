@@ -1,60 +1,40 @@
-# HomeOS India Production-Readiness Plan
+# HomeOS India: Production Readiness Plan
 
-## Purpose and release posture
+## Current posture
 
-HomeOS India is a protected home-services platform for customers, technicians, and internal operations. The current release provides the account-aware customer workflow, technician offer acceptance, operations visibility, S3-backed Passport documents, server-enforced quote approval, completion-OTP checks, payment-provider scaffolding, invoices, and a fixed **30-day warranty** record. This plan defines the remaining controls required before a broad consumer launch.
+HomeOS India has protected customer, technician, and operations workflows with persisted records and automated validation. It is ready for continued development and controlled testing. It is not yet a public commercial service because live payment confirmation, physical-device acceptance testing, location delivery, push delivery, abuse controls, and support operations need production evidence.
 
-> **Release principle:** customer safety, service integrity, and privacy take precedence over dispatch speed or growth targets.
+## Release gates
 
-## Current implementation status
+| Gate                       | Evidence needed before broad launch                                                                                                                                                  | Owner                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
+| Android acceptance         | Customer and technician role journeys completed on real Android devices, including OAuth return, document picker/upload/removal, camera/photo flows, and permission denial recovery. | Product and QA             |
+| Payments                   | Provider account configured by the owner, webhook signature verified, and a confirmed provider event creates the correct payment, invoice, warranty, and notification records.       | Payments owner             |
+| Location and notifications | Consent, privacy wording, device tokens, route/location provider, and delivered-notification monitoring tested on real devices.                                                      | Product and engineering    |
+| Operations security        | Admin procedures denied to non-admin accounts; audit records retained for verification, assignment, pricing, cancellation, and dispatch actions.                                     | Operations and security    |
+| Reliability                | Error monitoring, correlation IDs, rate limits, upload failure alerts, and runbooks exercised.                                                                                       | Engineering and operations |
+| Privacy and support        | Published privacy notice, retention and deletion policy, incident response path, and customer support escalation process.                                                            | Product and operations     |
 
-| Capability | Current state | Launch requirement |
-|---|---|---|
-| Authentication and roles | Manus OAuth with protected customer, technician, and administrator procedures | Verify account-recovery experience, browser cookie compatibility, and administrator-access reviews |
-| Quote approval | Server-enforced: work cannot begin without a sent quote being explicitly approved | Maintain audit logs for quote versions and customer approval timestamp |
-| Completion OTP | Server-enforced technician completion workflow | Deliver OTP through a production notification channel and add rate limits/lockouts |
-| Payment and invoices | Stripe checkout initiation and persisted payment/invoice/warranty contracts | Claim the Stripe sandbox, configure webhook signing, verify production confirmation and reversal flows |
-| Passport documents | Per-user/per-home S3-backed upload, list, and removal contracts | Add native Expo transport, file-scan policy, validation messages, retention policy, and support recovery workflow |
-| Dispatch | Scored, controlled dispatch rounds with verified-skill and availability filtering | Add dispatch runbooks, location quality thresholds, escalation timers, and on-call observability |
-| Operations | Protected overview and dispatch queue | Implement audited verification/pricing actions and export controls |
+## Payment boundary
 
-## Launch gates
+Payment provider activation is intentionally deferred until the owner requests it. Until then, the customer interface shows a provider-gated status only. It must not accept funds, report a job as paid, create an invoice, or activate a warranty from a local action.
 
-| Gate | Acceptance criterion | Owner | Evidence |
-|---|---|---|---|
-| Payment provider activation | Sandbox is claimed, webhook signature verified, and a successful payment creates a confirmed payment, invoice, warranty, and customer notification | Payments owner | Stripe test run, webhook log, database audit record |
-| Customer journey | A signed-in customer can create a home, request service, review a real quote, approve it, and view persisted job, invoice, and warranty states | Product and QA | Scripted device test on Android and mobile web |
-| Technician journey | A verified technician can receive, accept/decline, and view assigned work without seeing unrelated customer data | Operations and QA | Role-isolation test evidence |
-| OTP safeguards | OTP is delivered securely, rate-limited, expires as designed, and completion attempts are logged | Security and backend | Negative and replay-attempt test evidence |
-| Passport documents | Unsupported types and files over 10 MB show usable errors; permitted uploads are scoped to the owning home/account | Backend and mobile | Storage authorization and native client test evidence |
-| Operations security | Admin-only views/actions are denied to customer and technician sessions and action logs are retained | Operations and security | Authorization test results and audit-log sample |
+When payment work is explicitly approved, the implementation must include idempotent provider events, signature validation, reconciliation, cancellation and failure states, and a complete audit trail. No payment credentials belong in the repository.
 
-## Reliability, real-time updates, and observability
+## Real-time and delivery plan
 
-The product should initially use request refetching after critical mutations and introduce real-time updates only after a clear delivery guarantee is defined. Recommended next steps are authenticated event delivery for request status, quote, payment, and technician-arrival updates; idempotency keys for payment webhooks and dispatch actions; and a dead-letter/retry strategy for notifications.
+Critical state changes currently synchronize through protected reads after actions. A future real-time implementation should introduce authenticated, permission-aware event delivery for request status, quote approval, payment confirmation, and technician arrival. It should define ordering, retries, idempotency, and an outage fallback before it replaces the existing refresh-safe behaviour.
 
-Operational telemetry should measure service-request creation, dispatch offer acceptance/decline, quote approval, OTP failures, payment initiation/confirmation, invoice generation, document upload failures, and authorization denials. Each event should include a correlation ID, request ID where applicable, user role, outcome, and latency; logs must avoid raw OTPs, document bytes, home addresses, or payment card data. Alerting should cover webhook failures, invoice/warranty creation failures after confirmed payment, sustained dispatch backlog, abnormal OTP failures, and storage-upload error spikes.
+Technician location must be consented, purpose-limited, and visible only during an active service window. Precise live location and ETA must not be exposed before the relevant provider, privacy review, and device testing are complete.
 
-## Security, privacy, and abuse prevention
+## Security and abuse controls
 
-Home addresses, contact information, document links, and job proof are high-sensitivity data. Access must remain least-privilege and server-checked, never enforced only in the client. Before launch, complete a privacy notice, consent wording for service delivery and documents, data-retention schedule, account-deletion flow, incident response process, and support escalation path for compromised accounts.
+Protect addresses, document links, job proof, and account data through server-side authorization. Apply account and IP rate limits to account access and request creation, verify file type and size server-side, introduce OTP retry limits, and avoid raw OTPs, document bytes, addresses, or payment data in logs. Security-sensitive administrator actions should remain immutable and auditable.
 
-Abuse controls should include per-account and per-IP request limits, CAPTCHA or risk checks for repeated sign-up/request activity, file-content scanning where available, document MIME/size verification on the server, OTP retry limits, payment webhook signature verification, and immutable audit records for administrator approvals, pricing changes, and refund decisions. Never expose a technician’s precise location to a customer outside the active job context, and do not expose customer contact details beyond the assigned technician’s necessary service window.
+## Controlled launch sequence
 
-## Mobile and provider integration plan
-
-The Expo Android application must receive the same authenticated Passport document transport and validation UX as the web client. Test Android permission states for camera, photo library, files, and location, including denial/recovery paths. The live tracking map should use a provider only after consent, battery-impact review, acceptable-use rules, and technician location-sharing policy are complete.
-
-Stripe remains the source of truth for card/UPI payment confirmation. The server should create invoices and warranties only after a verified provider event, and payment redirects must have clear completed, pending, cancelled, and failed states. Wallet credits require a separately designed ledger, limits, anti-fraud controls, and reconciliation process before being treated as a production payment rail.
-
-## Support and operating model
-
-Define named escalation owners for customer safety, technician safety, payment disputes, missed appointments, warranty claims, and data-access requests. Create customer-facing support content for quote review, OTP safety, payment confirmation, invoices, warranty claims, and Passport documents. Operations needs runbooks for supply outages, dispatch escalation, bad actor suspension, provider outage, suspected fraud, document access errors, and data incidents.
-
-## Suggested release sequence
-
-1. Complete Stripe sandbox claim, webhook confirmation testing, and confirmed-payment-to-invoice/warranty automation.
-2. Add native Passport document upload/list/remove with validation feedback and test both customer and technician role isolation on physical Android devices.
-3. Add observability, rate limiting, event audit records, and operational alerting.
-4. Run a limited Hyderabad pilot with verified technicians, staffed support, and a daily operational review.
-5. Expand only after launch-gate evidence, incident drills, and measured service-quality targets are accepted by product, operations, and security owners.
+1. Complete real Android device acceptance tests for both customer and technician paths.
+2. Configure provider services only after the owner approves payment and notification activation.
+3. Add observability, rate limits, incident handling, and operating runbooks.
+4. Run a limited Hyderabad pilot with verified technicians and staffed support.
+5. Expand only after the release-gate evidence has been reviewed by product, operations, and security owners.

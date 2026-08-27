@@ -113,3 +113,6 @@
 - [x] Replace static web quick-service cards with persisted appliance-backed service shortcuts and a truthful no-appliance state.
 - [x] Remove static assessment fallback and locally selected payment methods from web customer flows; show only protected assessment results and provider-gated payment status.
 - [x] Export the current validated HomeOS India repository to the user’s confirmed public GitHub repository at kattasrinu73/HomeOS-India.
+- [x] Research current Claude Code Max program submission expectations and add accurate reviewer-ready documentation and repository configuration.
+- [x] Replace generated-sounding reviewer-facing repository documentation with concise professional project writing while retaining accurate provenance and validation boundaries.
+- [x] Add public contribution entry points and issue templates so genuine users and contributors can provide structured feedback without fabricated community signals.

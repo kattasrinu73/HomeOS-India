@@ -26,6 +26,9 @@ jobs:
 
   mobile:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -34,7 +37,7 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: mobile/pnpm-lock.yaml
-      - run: pnpm --dir mobile install --frozen-lockfile
-      - run: pnpm --dir mobile check
-      - run: pnpm --dir mobile test
-      - run: pnpm --dir mobile exec expo export --platform web
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm exec expo export --platform web
